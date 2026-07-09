@@ -25,21 +25,21 @@ body{
   -webkit-user-select:none;user-select:none;
 }
 input,textarea{-webkit-user-select:text;user-select:text}
-h1,h2,h3{margin:0 0 8px;font-weight:650}
+h1,h2,h3{margin:0 0 10px;font-weight:650}
 h1{font-size:20px}h2{font-size:17px}h3{font-size:15px}
-.wrap{max-width:640px;margin:0 auto;padding:16px 16px 0}
+.wrap{max-width:640px;margin:0 auto;padding:18px 16px 0}
 .muted{color:var(--muted);font-size:13px}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:12px}
-button{font-family:inherit;font-size:15px;cursor:pointer;border:none;border-radius:10px;padding:11px 14px;color:#fff;background:var(--surface2);transition:opacity .15s}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px}
+button{font-family:inherit;font-size:15px;cursor:pointer;border:none;border-radius:10px;padding:12px 16px;color:#fff;background:var(--surface2);transition:opacity .15s}
 button:active{opacity:.6}
 .btn-primary{background:var(--accent)}
 .btn-blue{background:var(--accent2)}
 .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
 .btn-danger{background:transparent;border:1px solid var(--danger);color:var(--danger)}
-.btn-sm{padding:7px 11px;font-size:13px}
-.row{display:flex;gap:8px;align-items:center}
+.btn-sm{padding:8px 12px;font-size:13px}
+.row{display:flex;gap:10px;align-items:center}
 .row.wrap{flex-wrap:wrap}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px}
 input,select{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:9px;color:var(--text);padding:10px;font-size:16px;text-align:center}
 input:focus,select:focus{outline:2px solid var(--accent2);border-color:transparent}
@@ -48,12 +48,17 @@ label.fld{display:block;font-size:11px;color:var(--muted);text-align:center;marg
 .tabbar button{flex:1;background:none;color:var(--muted);font-size:11px;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0}
 .tabbar button.active{color:var(--accent)}
 .tabbar .ic{font-size:20px}
-.daygrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.daycard{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;text-align:left}
+.daygrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.daycard{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;text-align:left}
 .daycard .big{font-size:32px;font-weight:750;color:var(--accent)}
-.ex{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:10px}
-.ex-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px}
+.ex{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.ex-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px}
 .ex-title{font-weight:650;font-size:15px}
+.exdone{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--radius);padding:13px 15px;margin-bottom:12px;cursor:pointer;transition:opacity .2s}
+.exdone:active{opacity:.6}
+.exdone .ck{color:var(--accent);font-weight:800;font-size:16px}
+.exdone .nm{font-weight:650;font-size:15px}
+.exdone .sm{color:var(--muted);font-size:13px;margin-left:auto;text-align:right}
 .lastbox{background:var(--surface2);border-left:3px solid var(--accent);border-radius:8px;padding:9px 11px;margin-bottom:9px}
 .lastbox .hl{color:var(--text);font-weight:600;font-size:16px;margin-top:2px;line-height:1.35}
 .lastbox .lbl{font-size:10px;letter-spacing:.5px;color:var(--muted)}
@@ -66,14 +71,22 @@ label.fld{display:block;font-size:11px;color:var(--muted);text-align:center;marg
 .histrow .hs{text-align:right}
 .tag{display:inline-block;font-size:10px;padding:2px 6px;border-radius:6px;background:var(--surface2);color:var(--muted);margin-left:6px;vertical-align:middle}
 .tag.mvw{background:rgba(245,158,11,.15);color:var(--warn)}
-.setrow{display:grid;grid-template-columns:26px 1fr 1fr 1fr 34px;gap:6px;align-items:center;margin-bottom:6px}
+.setrow{display:grid;grid-template-columns:26px 1fr 1fr 1fr 34px;gap:8px;align-items:center;margin-bottom:8px}
 .setrow .idx{color:var(--muted);text-align:center;font-size:13px}
 .setrow .del{background:none;color:var(--muted);padding:4px;font-size:16px}
 .pill{display:inline-block;padding:3px 8px;border-radius:20px;background:var(--surface2);font-size:12px;color:var(--muted);margin:2px 4px 2px 0}
-.timer{position:fixed;left:16px;right:16px;bottom:82px;max-width:608px;margin:0 auto;background:var(--accent2);border-radius:12px;padding:12px 16px;display:none;justify-content:space-between;align-items:center;z-index:40;box-shadow:0 8px 24px rgba(0,0,0,.4)}
-.timer.on{display:flex}
-.timer .t{font-size:24px;font-weight:750;font-variant-numeric:tabular-nums}
-.sess{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)}
+.sessionbar{position:fixed;left:0;right:0;bottom:calc(66px + env(safe-area-inset-bottom));z-index:45;display:none;padding:0 12px;pointer-events:none}
+.sessionbar.on{display:block}
+.sb-inner{max-width:640px;margin:0 auto;position:relative;min-height:60px;border-radius:14px;overflow:hidden;pointer-events:auto;background:var(--surface2);border:1px solid var(--border);box-shadow:0 6px 22px rgba(0,0,0,.45);transition:background-color .3s ease,border-color .3s ease}
+.sessionbar.resting .sb-inner{background:var(--accent2);border-color:transparent}
+.sb-idle,.sb-rest{position:absolute;inset:0;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 16px;transition:opacity .25s ease}
+.sb-rest{opacity:0;pointer-events:none}
+.sessionbar.resting .sb-idle{opacity:0;pointer-events:none}
+.sessionbar.resting .sb-rest{opacity:1;pointer-events:auto}
+.sb-t{font-size:22px;font-weight:750;font-variant-numeric:tabular-nums;line-height:1.05}
+.sb-lbl{font-size:10px;letter-spacing:.5px;color:var(--muted)}
+.sb-rest .sb-lbl{color:rgba(255,255,255,.8)}
+.sess{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--border)}
 .sess:last-child{border-bottom:none}
 .dot{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;background:var(--surface2)}
 canvas{width:100%;height:auto;display:block}
@@ -92,11 +105,19 @@ a{color:var(--accent2)}
 <body>
 <div class="wrap" id="app"></div>
 
-<div class="timer" id="timer">
-  <div><div class="muted" style="color:rgba(255,255,255,.7);font-size:11px">DESCANSO <span id="timerTgt"></span></div><div class="t" id="timerT">0:00</div></div>
-  <div class="row">
-    <button class="btn-sm" style="background:#fff;color:#0b0f14;font-weight:700" onclick="markLap()">🏁 Próxima série</button>
-    <button class="btn-sm" style="background:rgba(255,255,255,.2)" onclick="stopRest()">Parar</button>
+<div class="sessionbar" id="sessionbar">
+  <div class="sb-inner">
+    <div class="sb-idle">
+      <div><div class="sb-lbl">TEMPO TOTAL</div><div class="sb-t" id="sbElapsed">0:00</div></div>
+      <div style="text-align:right"><div class="sb-lbl" id="sbProg">0/0 ex</div><div class="muted" id="sbVol" style="font-size:12px">0 kg·rep</div></div>
+    </div>
+    <div class="sb-rest">
+      <div><div class="sb-lbl"><span id="sbRestLbl">DESCANSO</span> <span id="sbRestTgt"></span></div><div class="sb-t" id="sbRestT" style="color:#fff">0:00</div></div>
+      <div class="row">
+        <button class="btn-sm" style="background:#fff;color:#0b0f14;font-weight:700" onclick="markLap()">🏁 Próxima</button>
+        <button class="btn-sm" style="background:rgba(255,255,255,.2)" onclick="stopRest()">Parar</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -106,55 +127,49 @@ a{color:var(--accent2)}
 <script>
 "use strict";
 /* ============ STORE ============ */
-const K = {tpl:"gymlog_templates_v2", sess:"gymlog_sessions_v1", active:"gymlog_active_v1", cfg:"gymlog_cfg_v1"};
+const K = {tpl:"gymlog_templates_v3", sess:"gymlog_sessions_v1", active:"gymlog_active_v1", cfg:"gymlog_cfg_v1"};
 const load = (k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}};
 const save = (k,v)=>localStorage.setItem(k,JSON.stringify(v));
 
-/* Templates extraídos do vault Obsidian: 54.01 Academia (treino-atual) */
+/* Templates do vault Obsidian — Ciclo 3 (01 Junho 2026, treino-atual) */
 const DEFAULT_TEMPLATES = {
   A:{name:"Pernas & Glúteos I", ex:[
-    {n:"Hips Thrust - Máquina", sr:"4x12", rest:90, mvw:true, notes:"Principal — carga pesada, squeeze topo 2s"},
-    {n:"Agachamento Frontal - Barra Solta", sr:"3x10", rest:120, mvw:false, notes:"Profundo, excêntrico 3s"},
-    {n:"Leg Press", sr:"4x12", rest:90, mvw:false, notes:"Pés altos e afastados (glúteo)"},
-    {n:"Extensão Coxa - Máquina", sr:"3x12", rest:60, mvw:false, notes:"Contração no topo"},
-    {n:"Abdução - máquina (sem descanso)", sr:"3x15", rest:0, mvw:false, notes:"Drop set"},
-    {n:"Panturrilha", sr:"4x15", rest:45, mvw:false, notes:"Pausa embaixo"},
-    {n:"Abdomen - máquina", sr:"3x12", rest:60, mvw:false, notes:""},
-    {n:"Bike", sr:"10-15 min", rest:0, mvw:false, notes:"Cardio pós, FC 130-140"},
+    {n:"Hips Thrust - Máquina", sr:"4×10", rest:120, mvw:true, notes:"Principal — meta 90kg×10 limpas; squeeze topo 2s"},
+    {n:"Leg Press", sr:"4×10", rest:120, mvw:true, notes:"Meta 170kg. Pés altos e afastados"},
+    {n:"Agachamento Goblet - Haltere", sr:"3×12", rest:90, mvw:false, notes:"Amplitude completa (24kg→volta ao frontal)"},
+    {n:"Extensão Coxa - Máquina", sr:"3×10", rest:60, mvw:true, notes:"Pausa 1s no topo. Meta 95kg×10"},
+    {n:"Abdução - máquina (sem descanso)", sr:"3×15", rest:0, mvw:false, notes:"Drop 130/105/80kg"},
+    {n:"Panturrilha", sr:"3×15", rest:45, mvw:false, notes:"45kg. Pausa 2s no topo"},
   ]},
   B:{name:"Peito & Tríceps", ex:[
-    {n:"Supino reto - banco", sr:"4x10", rest:120, mvw:true, notes:"Principal — progressão de carga"},
-    {n:"Fly para baixo - polia", sr:"4x12", rest:60, mvw:true, notes:"⭐ CHAVE peito inferior"},
-    {n:"Supino Inclinado - banco", sr:"3x10", rest:90, mvw:false, notes:"30°"},
-    {n:"Dips", sr:"3x10-12", rest:90, mvw:false, notes:"Tronco à frente = peito inferior"},
-    {n:"Crucifixo banco", sr:"3x12", rest:60, mvw:false, notes:"Banco reto/decline"},
-    {n:"V-Bar Extension", sr:"3x12", rest:60, mvw:false, notes:""},
-    {n:"Extensão tríceps maquina", sr:"3x12", rest:60, mvw:false, notes:""},
+    {n:"Supino reto - banco", sr:"4×8-10", rest:150, mvw:true, notes:"Principal — subir carga (52-55kg)"},
+    {n:"Supino Declinado - Smith ou Banco", sr:"3×10", rest:120, mvw:false, notes:"Foco peito inferior"},
+    {n:"Fly para baixo - polia", sr:"4×12", rest:60, mvw:true, notes:"⭐ CHAVE peito inferior. Meta 30kg×12"},
+    {n:"Dips", sr:"3×máx", rest:90, mvw:false, notes:"Tronco à frente = peito inferior. Até a falha"},
+    {n:"V-Bar Extension", sr:"4×12", rest:60, mvw:true, notes:"Consolidar 25kg×12"},
+    {n:"Overhead Triceps Extension - Corda", sr:"3×12", rest:60, mvw:false, notes:""},
   ]},
   C:{name:"Pernas & Glúteos II", ex:[
-    {n:"Stiff - com barra solta", sr:"4x10", rest:120, mvw:true, notes:"Principal — stretch no glúteo, não na lombar"},
-    {n:"Agachamento Búlgaro - Smith", sr:"3x10 (cada perna)", rest:90, mvw:false, notes:"Passo longo, tronco inclinado"},
-    {n:"Afundo - Smith nas costas", sr:"3x10 (cada perna)", rest:90, mvw:false, notes:"Passo longo, descer profundo"},
-    {n:"Posterior Coxa - dumbell tapete", sr:"3x12", rest:60, mvw:false, notes:"Squeeze no topo"},
-    {n:"Levantamento lateral - Polia", sr:"3x15 (cada perna)", rest:45, mvw:false, notes:"Glúteo médio (formato redondo)"},
-    {n:"Chute - Coice", sr:"3x12 (cada perna)", rest:45, mvw:false, notes:"Hiperextensão do quadril"},
-    {n:"Extensão Costas Máquina", sr:"3x12", rest:60, mvw:false, notes:"Glúteos + lombar"},
+    {n:"Stiff - com barra solta", sr:"3×10-12", rest:120, mvw:true, notes:"Meta 42kg×12→45kg×10. Stretch no glúteo"},
+    {n:"Agachamento Búlgaro - Smith", sr:"3×10", rest:90, mvw:true, notes:"Consolidar 25kg×10. Passo longo"},
+    {n:"Cadeira Flexora deitada", sr:"3×12", rest:60, mvw:true, notes:"Reavaliar carga semana 1"},
+    {n:"Afundo - Smith nas costas", sr:"3×10", rest:90, mvw:false, notes:"Meta 30kg. Passo longo"},
+    {n:"Levantamento lateral - Polia", sr:"3×12", rest:45, mvw:false, notes:"7.5kg. Glúteo médio, tronco reto"},
+    {n:"Chute - Coice", sr:"3×12", rest:45, mvw:false, notes:"15kg. Hiperextensão do quadril"},
   ]},
   D:{name:"Costas, Ombros & Bíceps", ex:[
-    {n:"Desenvolvimento Militar (Máquina)", sr:"4x10", rest:120, mvw:true, notes:"Principal ombro — carga progressiva"},
-    {n:"Pulldown Machine", sr:"4x10", rest:90, mvw:false, notes:"Squeeze nas escápulas"},
-    {n:"Remada máquina", sr:"3x10", rest:90, mvw:false, notes:"Retração escapular"},
-    {n:"Elevação Lateral com Halteres", sr:"4x12", rest:60, mvw:false, notes:"Deltóide lateral"},
-    {n:"Rosca direta com barra W", sr:"3x12", rest:60, mvw:false, notes:""},
-    {n:"Rosca martelo com halteres unitaleral em pé", sr:"3x12", rest:60, mvw:false, notes:"Braquial"},
-    {n:"Adbomen - Cadeira Inclinada", sr:"3x20", rest:45, mvw:false, notes:""},
+    {n:"Desenvolvimento Militar (Máquina)", sr:"3×10-12", rest:120, mvw:true, notes:"Consolidar 45kg×10"},
+    {n:"Pulldown Machine", sr:"4×10", rest:90, mvw:true, notes:"Consolidar 45kg×10. Pegada larga"},
+    {n:"Remada máquina", sr:"3×12", rest:90, mvw:false, notes:"Fixar 45kg estável"},
+    {n:"Elevação Lateral com Halteres", sr:"4×12", rest:45, mvw:true, notes:"12kg. 4×12 todas limpas"},
+    {n:"Face Pull - Polia Corda", sr:"3×15", rest:45, mvw:false, notes:"Saúde dos ombros. Carga leve, contração forte"},
+    {n:"Rosca direta com barra W", sr:"3×10-12", rest:60, mvw:false, notes:"38kg"},
+    {n:"Adbomen - Cadeira Inclinada", sr:"3×15", rest:45, mvw:false, notes:"Disco 5kg no peito"},
   ]},
 };
 
-const SEED_SESSIONS=[{"day":"D","date":"2025-06-10","exercises":[{"n":"Rosca direta com barra W","sets":[{"w":"38","r":"10"},{"w":"38","r":"12"},{"w":"38","r":"12"}]}]},{"day":"A","date":"2026-02-23","exercises":[{"n":"Agachamento Frontal - Barra Solta","sets":[{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"}]},{"n":"Hips Thrust - Máquina","sets":[{"w":"80","r":"10"},{"w":"80","r":"10"},{"w":"80","r":"10"},{"w":"80","r":"10"}]}]},{"day":"B","date":"2026-02-24","exercises":[{"n":"V-Bar Extension","sets":[{"w":"21.25","r":"12"},{"w":"21.25","r":"12"},{"w":"21.25","r":"12"}]},{"n":"Extensão tríceps maquina","sets":[{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"}]},{"n":"Crucifixo banco","sets":[{"w":"12","r":"12"},{"w":"12","r":"12"},{"w":"12","r":"12"}]},{"n":"Supino Inclinado - banco","sets":[{"w":"40","r":"10"},{"w":"40","r":"10"},{"w":"40","r":"9"}]}]},{"day":"C","date":"2026-02-26","exercises":[{"n":"Agachamento Búlgaro - Smith","sets":[{"w":"20","r":"10"},{"w":"20","r":"10"},{"w":"20","r":"10"}]},{"n":"Abdomen - máquina","sets":[{"w":"90","r":"12"},{"w":"90","r":"12"},{"w":"90","r":"12"}]},{"n":"Extensão Coxa - Máquina","sets":[{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"}]},{"n":"Panturrilha","sets":[{"w":"40","r":"12"},{"w":"40","r":"12"},{"w":"40","r":"12"}]},{"n":"Levantamento lateral - Polia","sets":[{"w":"7.5","r":"15"},{"w":"7.5","r":"15"},{"w":"7.5","r":"15"}]},{"n":"Stiff - com barra solta","sets":[{"w":"38","r":"10"},{"w":"38","r":"10"},{"w":"38","r":"10"},{"w":"38","r":"10"}]},{"n":"Desenvolvimento Militar (Máquina)","sets":[{"w":"40","r":"10"},{"w":"40","r":"10"},{"w":"40","r":"10"},{"w":"40","r":"10"}]},{"n":"Rosca martelo com halteres unitaleral em pé","sets":[{"w":"14","r":"12"},{"w":"14","r":"12"},{"w":"14","r":"12"}]},{"n":"Elevação Lateral com Halteres","sets":[{"w":"12","r":"12"},{"w":"12","r":"12"},{"w":"12","r":"12"},{"w":"12","r":"12"}]},{"n":"Afundo - Smith nas costas","sets":[{"w":"20","r":"10"},{"w":"20","r":"10"},{"w":"20","r":"10"}]},{"n":"Remada máquina","sets":[{"w":"50","r":"10"},{"w":"40","r":"10"},{"w":"40","r":"10"}]},{"n":"Posterior Coxa - dumbell tapete","sets":[{"w":"24","r":"10"},{"w":"24","r":"10"},{"w":"24","r":"10"}]},{"n":"Abdução - máquina (sem descanso)","sets":[{"w":"122.5","r":"12"},{"w":"100","r":"12"},{"w":"77.5","r":"12"}]},{"n":"Leg Press","sets":[{"w":"160","r":"10"},{"w":"160","r":"10"},{"w":"160","r":"10"},{"w":"160","r":"10"}]},{"n":"Rosca direta com barra W","sets":[{"w":"38","r":"12"},{"w":"38","r":"12"},{"w":"38","r":"10"}]}]},{"day":"B","date":"2026-02-27","exercises":[{"n":"Fly para baixo - polia","sets":[{"w":"22.5","r":"12"},{"w":"22.5","r":"12"},{"w":"22.5","r":"12"},{"w":"22.5","r":"12"}]},{"n":"Supino reto - banco","sets":[{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"}]},{"n":"Pulldown Machine","sets":[{"w":"40","r":"10"},{"w":"40","r":"10"},{"w":"40","r":"10"},{"w":"40","r":"10"},{"w":"40","r":"10"},{"w":"40","r":"10"},{"w":"40","r":"10"},{"w":"40","r":"10"}]}]},{"day":"A","date":"2026-03-02","exercises":[{"n":"Abdomen - máquina","sets":[{"w":"90","r":"12"},{"w":"90","r":"12"},{"w":"90","r":"12"}]},{"n":"Extensão Coxa - Máquina","sets":[{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"}]},{"n":"Panturrilha","sets":[{"w":"40","r":"12"},{"w":"40","r":"12"},{"w":"40","r":"12"}]},{"n":"Agachamento Frontal - Barra Solta","sets":[{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"}]},{"n":"Hips Thrust - Máquina","sets":[{"w":"80","r":"10"},{"w":"80","r":"10"},{"w":"80","r":"10"},{"w":"80","r":"10"}]},{"n":"Abdução - máquina (sem descanso)","sets":[{"w":"122.5","r":"15"},{"w":"100","r":"15"},{"w":"77.5","r":"15"}]},{"n":"Leg Press","sets":[{"w":"160","r":"10"},{"w":"160","r":"10"},{"w":"160","r":"10"},{"w":"160","r":"10"}]}]},{"day":"B","date":"2026-03-03","exercises":[{"n":"V-Bar Extension","sets":[{"w":"21.25","r":"12"},{"w":"21.25","r":"12"},{"w":"21.25","r":"12"}]},{"n":"Fly para baixo - polia","sets":[{"w":"22.5","r":"12"},{"w":"22.5","r":"12"},{"w":"22.5","r":"12"},{"w":"22.5","r":"12"}]},{"n":"Supino reto - banco","sets":[{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"}]},{"n":"Extensão tríceps maquina","sets":[{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"}]},{"n":"Crucifixo banco","sets":[{"w":"12","r":"12"},{"w":"12","r":"12"},{"w":"12","r":"12"}]},{"n":"Supino Inclinado - banco","sets":[{"w":"40","r":"10"},{"w":"40","r":"10"},{"w":"40","r":"10"}]}]},{"day":"C","date":"2026-03-05","exercises":[{"n":"Agachamento Búlgaro - Smith","sets":[{"w":"20","r":"10"},{"w":"20","r":"10"},{"w":"20","r":"10"}]},{"n":"Levantamento lateral - Polia","sets":[{"w":"7.5","r":"15"},{"w":"7.5","r":"15"},{"w":"7.5","r":"15"}]},{"n":"Stiff - com barra solta","sets":[{"w":"38","r":"10"},{"w":"38","r":"10"},{"w":"38","r":"10"},{"w":"38","r":"10"}]},{"n":"Afundo - Smith nas costas","sets":[{"w":"20","r":"10"},{"w":"30","r":"10"},{"w":"30","r":"10"}]},{"n":"Posterior Coxa - dumbell tapete","sets":[{"w":"24","r":"10"},{"w":"24","r":"10"},{"w":"24","r":"10"}]}]},{"day":"D","date":"2026-03-06","exercises":[{"n":"Desenvolvimento Militar (Máquina)","sets":[{"w":"40","r":"10"},{"w":"40","r":"12"},{"w":"40","r":"10"},{"w":"40","r":"10"}]},{"n":"Rosca martelo com halteres unitaleral em pé","sets":[{"w":"14","r":"12"},{"w":"14","r":"12"},{"w":"14","r":"12"}]},{"n":"Pulldown Machine","sets":[{"w":"40","r":"10"},{"w":"40","r":"12"},{"w":"40","r":"10"},{"w":"40","r":"10"}]},{"n":"Elevação Lateral com Halteres","sets":[{"w":"12","r":"10"},{"w":"12","r":"12"},{"w":"12","r":"12"},{"w":"12","r":"12"}]},{"n":"Remada máquina","sets":[{"w":"40","r":"10"},{"w":"40","r":"12"},{"w":"40","r":"10"},{"w":"50","r":"10"},{"w":"40","r":"10"},{"w":"40","r":"10"}]},{"n":"Rosca direta com barra W","sets":[{"w":"38","r":"12"},{"w":"38","r":"12"},{"w":"38","r":"10"}]}]},{"day":"A","date":"2026-03-09","exercises":[{"n":"Abdomen - máquina","sets":[{"w":"85","r":"12"},{"w":"90","r":"12"},{"w":"90","r":"12"}]},{"n":"Extensão Coxa - Máquina","sets":[{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"}]},{"n":"Panturrilha","sets":[{"w":"40","r":"12"},{"w":"40","r":"12"},{"w":"40","r":"12"}]},{"n":"Agachamento Frontal - Barra Solta","sets":[{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"}]},{"n":"Hips Thrust - Máquina","sets":[{"w":"80","r":"10"},{"w":"80","r":"10"},{"w":"80","r":"10"},{"w":"80","r":"10"}]},{"n":"Abdução - máquina (sem descanso)","sets":[{"w":"122.5","r":"15"},{"w":"100","r":"15"},{"w":"77.5","r":"15"},{"w":"122.5","r":"15"},{"w":"100","r":"15"},{"w":"77.5","r":"15"}]},{"n":"Leg Press","sets":[{"w":"160","r":"10"},{"w":"160","r":"10"},{"w":"160","r":"10"},{"w":"160","r":"10"}]}]},{"day":"B","date":"2026-03-10","exercises":[{"n":"V-Bar Extension","sets":[{"w":"21.25","r":"12"},{"w":"21.25","r":"12"},{"w":"21.25","r":"12"}]},{"n":"Fly para baixo - polia","sets":[{"w":"27","r":"12"},{"w":"27","r":"12"},{"w":"27","r":"12"},{"w":"27","r":"12"},{"w":"27","r":"12"},{"w":"27","r":"12"},{"w":"27","r":"12"},{"w":"27","r":"12"}]},{"n":"Supino reto - banco","sets":[{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"}]},{"n":"Extensão tríceps maquina","sets":[{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"}]},{"n":"Crucifixo banco","sets":[{"w":"12","r":"12"},{"w":"14","r":"12"},{"w":"14","r":"12"}]},{"n":"Supino Inclinado - banco","sets":[{"w":"40","r":"10"},{"w":"40","r":"10"},{"w":"40","r":"10"}]}]},{"day":"C","date":"2026-03-12","exercises":[{"n":"Chute - Coice","sets":[{"w":"12.5","r":"12"},{"w":"12.5","r":"10"},{"w":"12.5","r":"10"}]},{"n":"Agachamento Búlgaro - Smith","sets":[{"w":"20","r":"10"},{"w":"20","r":"10"},{"w":"20","r":"10"}]},{"n":"Levantamento lateral - Polia","sets":[{"w":"7.5","r":"10"},{"w":"7.5","r":"10"},{"w":"7.5","r":"10"}]},{"n":"Stiff - com barra solta","sets":[{"w":"38","r":"10"},{"w":"38","r":"10"},{"w":"38","r":"10"}]},{"n":"Afundo - Smith nas costas","sets":[{"w":"20","r":"10"},{"w":"20","r":"10"},{"w":"20","r":"10"}]},{"n":"Posterior Coxa - dumbell tapete","sets":[{"w":"24","r":"10"},{"w":"24","r":"10"},{"w":"24","r":"10"}]},{"n":"Extensão Costas Máquina","sets":[{"w":"95","r":"10"},{"w":"95","r":"10"},{"w":"95","r":"8"}]}]},{"day":"D","date":"2026-03-13","exercises":[{"n":"Desenvolvimento Militar (Máquina)","sets":[{"w":"40","r":"10"},{"w":"40","r":"12"},{"w":"40","r":"10"},{"w":"40","r":"10"}]},{"n":"Rosca martelo com halteres unitaleral em pé","sets":[{"w":"14","r":"12"},{"w":"14","r":"12"},{"w":"14","r":"12"}]},{"n":"Elevação Lateral com Halteres","sets":[{"w":"12","r":"10"},{"w":"12","r":"12"},{"w":"12","r":"12"},{"w":"12","r":"12"}]},{"n":"Rosca direta com barra W","sets":[{"w":"38","r":"10"},{"w":"38","r":"10"},{"w":"38","r":"12"}]}]},{"day":"A","date":"2026-03-16","exercises":[{"n":"Abdomen - máquina","sets":[{"w":"85","r":"12"},{"w":"90","r":"12"},{"w":"90","r":"12"}]},{"n":"Extensão Coxa - Máquina","sets":[{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"}]},{"n":"Panturrilha","sets":[{"w":"40","r":"12"},{"w":"40","r":"12"},{"w":"40","r":"12"}]},{"n":"Agachamento Frontal - Barra Solta","sets":[{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"}]},{"n":"Hips Thrust - Máquina","sets":[{"w":"80","r":"10"},{"w":"80","r":"10"},{"w":"80","r":"10"},{"w":"80","r":"10"}]},{"n":"Leg Press","sets":[{"w":"160","r":"10"},{"w":"160","r":"10"},{"w":"160","r":"10"},{"w":"160","r":"10"}]}]},{"day":"B","date":"2026-03-17","exercises":[{"n":"V-Bar Extension","sets":[{"w":"21.25","r":"12"},{"w":"25","r":"12"},{"w":"25","r":"12"}]},{"n":"Supino reto - banco","sets":[{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"}]},{"n":"Extensão tríceps maquina","sets":[{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"}]},{"n":"Extensão Costas Máquina","sets":[{"w":"95","r":"10"},{"w":"95","r":"10"},{"w":"95","r":"10"}]},{"n":"Crucifixo banco","sets":[{"w":"12","r":"12"},{"w":"12","r":"12"},{"w":"12","r":"12"}]},{"n":"Supino Inclinado - banco","sets":[{"w":"40","r":"10"},{"w":"40","r":"10"},{"w":"40","r":"10"}]}]},{"day":"C","date":"2026-03-20","exercises":[{"n":"Agachamento Búlgaro - Smith","sets":[{"w":"20","r":"10"},{"w":"20","r":"10"},{"w":"20","r":"10"}]},{"n":"Levantamento lateral - Polia","sets":[{"w":"7.5","r":"10"},{"w":"7.5","r":"10"},{"w":"7.5","r":"10"}]},{"n":"Stiff - com barra solta","sets":[{"w":"38","r":"12"},{"w":"38","r":"10"},{"w":"38","r":"10"}]},{"n":"Afundo - Smith nas costas","sets":[{"w":"20","r":"10"},{"w":"20","r":"10"},{"w":"20","r":"10"}]},{"n":"Posterior Coxa - dumbell tapete","sets":[{"w":"24","r":"10"},{"w":"24","r":"10"},{"w":"24","r":"10"}]},{"n":"Extensão Costas Máquina","sets":[{"w":"95","r":"10"},{"w":"95","r":"10"},{"w":"95","r":"8"}]}]},{"day":"D","date":"2026-03-21","exercises":[{"n":"Desenvolvimento Militar (Máquina)","sets":[{"w":"40","r":"12"},{"w":"40","r":"12"},{"w":"40","r":"12"},{"w":"40","r":"12"}]},{"n":"Rosca martelo com halteres unitaleral em pé","sets":[{"w":"16","r":"12"},{"w":"16","r":"12"},{"w":"16","r":"10"}]},{"n":"Pulldown Machine","sets":[{"w":"40","r":"12"},{"w":"40","r":"12"},{"w":"40","r":"10"},{"w":"40","r":"10"}]},{"n":"Elevação Lateral com Halteres","sets":[{"w":"12","r":"10"},{"w":"12","r":"12"},{"w":"12","r":"12"},{"w":"12","r":"12"}]},{"n":"Remada máquina","sets":[{"w":"40","r":"12"},{"w":"40","r":"12"},{"w":"40","r":"10"}]},{"n":"Rosca direta com barra W","sets":[{"w":"38","r":"12"},{"w":"38","r":"12"},{"w":"38","r":"10"}]}]},{"day":"A","date":"2026-03-23","exercises":[{"n":"Extensão Costas Máquina","sets":[{"w":"95","r":"10"},{"w":"95","r":"10"},{"w":"95","r":"10"}]}]},{"day":"A","date":"2026-03-25","exercises":[{"n":"Abdomen - máquina","sets":[{"w":"85","r":"12"},{"w":"90","r":"12"},{"w":"90","r":"12"}]},{"n":"Extensão Coxa - Máquina","sets":[{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"}]},{"n":"Panturrilha","sets":[{"w":"40","r":"12"},{"w":"40","r":"12"},{"w":"40","r":"12"}]},{"n":"Agachamento Frontal - Barra Solta","sets":[{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"}]},{"n":"Hips Thrust - Máquina","sets":[{"w":"80","r":"10"},{"w":"80","r":"10"},{"w":"80","r":"10"}]},{"n":"Abdução - máquina (sem descanso)","sets":[{"w":"122.5","r":"15"},{"w":"100","r":"15"},{"w":"77.5","r":"15"}]},{"n":"Leg Press","sets":[{"w":"160","r":"10"},{"w":"160","r":"10"},{"w":"160","r":"10"},{"w":"160","r":"10"}]}]},{"day":"B","date":"2026-03-27","exercises":[{"n":"V-Bar Extension","sets":[{"w":"25","r":"12"},{"w":"25","r":"12"},{"w":"25","r":"12"},{"w":"25","r":"10"}]},{"n":"Fly para baixo - polia","sets":[{"w":"27","r":"10"},{"w":"27","r":"11"},{"w":"27","r":"12"},{"w":"27","r":"10"}]},{"n":"Supino reto - banco","sets":[{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"8"},{"w":"50","r":"10"}]},{"n":"Extensão tríceps maquina","sets":[{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"}]},{"n":"Crucifixo banco","sets":[{"w":"12","r":"12"},{"w":"12","r":"12"},{"w":"12","r":"12"}]},{"n":"Supino Inclinado - banco","sets":[{"w":"40","r":"10"},{"w":"40","r":"10"},{"w":"40","r":"10"}]}]},{"day":"C","date":"2026-03-28","exercises":[{"n":"Chute - Coice","sets":[{"w":"12.5","r":"12"},{"w":"12.5","r":"12"},{"w":"12.5","r":"12"}]},{"n":"Agachamento Búlgaro - Smith","sets":[{"w":"20","r":"10"},{"w":"20","r":"10"},{"w":"20","r":"10"}]},{"n":"Levantamento lateral - Polia","sets":[{"w":"7.5","r":"10"},{"w":"7.5","r":"10"},{"w":"7.5","r":"10"}]},{"n":"Stiff - com barra solta","sets":[{"w":"38","r":"12"},{"w":"38","r":"12"},{"w":"38","r":"12"}]},{"n":"Desenvolvimento Militar (Máquina)","sets":[{"w":"40","r":"12"},{"w":"40","r":"12"},{"w":"40","r":"12"},{"w":"40","r":"12"}]},{"n":"Rosca martelo com halteres unitaleral em pé","sets":[{"w":"16","r":"12"},{"w":"16","r":"12"},{"w":"16","r":"10"}]},{"n":"Pulldown Machine","sets":[{"w":"40","r":"12"},{"w":"40","r":"12"},{"w":"40","r":"10"},{"w":"40","r":"10"}]},{"n":"Elevação Lateral com Halteres","sets":[{"w":"12","r":"10"},{"w":"12","r":"12"},{"w":"12","r":"12"},{"w":"12","r":"12"}]},{"n":"Afundo - Smith nas costas","sets":[{"w":"20","r":"10"},{"w":"20","r":"10"},{"w":"30","r":"10"}]},{"n":"Remada máquina","sets":[{"w":"40","r":"12"},{"w":"40","r":"12"},{"w":"40","r":"10"}]},{"n":"Posterior Coxa - dumbell tapete","sets":[{"w":"24","r":"10"},{"w":"24","r":"10"},{"w":"24","r":"10"}]},{"n":"Rosca direta com barra W","sets":[{"w":"38","r":"12"},{"w":"38","r":"12"},{"w":"38","r":"10"}]},{"n":"Extensão Costas Máquina","sets":[{"w":"95","r":"10"},{"w":"95","r":"10"},{"w":"95","r":"8"}]}]},{"day":"A","date":"2026-03-31","exercises":[{"n":"Abdomen - máquina","sets":[{"w":"85","r":"12"},{"w":"90","r":"12"},{"w":"90","r":"12"}]},{"n":"Extensão Coxa - Máquina","sets":[{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"}]},{"n":"Panturrilha","sets":[{"w":"40","r":"12"},{"w":"40","r":"12"},{"w":"40","r":"12"}]},{"n":"Agachamento Frontal - Barra Solta","sets":[{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"}]},{"n":"Hips Thrust - Máquina","sets":[{"w":"80","r":"10"},{"w":"80","r":"10"},{"w":"80","r":"10"},{"w":"80","r":"10"}]},{"n":"Abdução - máquina (sem descanso)","sets":[{"w":"122.5","r":"15"},{"w":"100","r":"15"},{"w":"77.5","r":"15"}]},{"n":"Leg Press","sets":[{"w":"160","r":"10"},{"w":"160","r":"10"},{"w":"160","r":"10"},{"w":"160","r":"10"}]}]},{"day":"B","date":"2026-04-03","exercises":[{"n":"V-Bar Extension","sets":[{"w":"25","r":"12"},{"w":"25","r":"12"},{"w":"25","r":"12"},{"w":"25","r":"12"}]},{"n":"Fly para baixo - polia","sets":[{"w":"25","r":"12"},{"w":"25","r":"12"},{"w":"25","r":"12"},{"w":"25","r":"12"}]},{"n":"Supino reto - banco","sets":[{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"}]},{"n":"Supino Declinado - Smith ou Banco","sets":[{"w":"16","r":"10"},{"w":"16","r":"10"},{"w":"16","r":"10"}]},{"n":"Overhead Triceps Extension - Corda","sets":[{"w":"18","r":"12"},{"w":"18","r":"12"}]}]},{"day":"A","date":"2026-04-07","exercises":[{"n":"Extensão Coxa - Máquina","sets":[{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"}]},{"n":"Agachamento Goblet - Haltere","sets":[{"w":"24","r":"12"},{"w":"24","r":"12"},{"w":"24","r":"12"}]},{"n":"Hips Thrust - Máquina","sets":[{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"}]},{"n":"Abdução - máquina (sem descanso)","sets":[{"w":"122.5","r":"15"},{"w":"100","r":"15"},{"w":"77.5","r":"15"}]},{"n":"Leg Press","sets":[{"w":"180","r":"10"},{"w":"180","r":"10"},{"w":"180","r":"10"},{"w":"180","r":"10"}]}]},{"day":"C","date":"2026-04-08","exercises":[{"n":"Chute - Coice","sets":[{"w":"15","r":"12"},{"w":"15","r":"12"},{"w":"15","r":"12"}]},{"n":"Agachamento Búlgaro - Smith","sets":[{"w":"25","r":"10"},{"w":"25","r":"10"},{"w":"25","r":"10"}]},{"n":"Levantamento lateral - Polia","sets":[{"w":"7.5","r":"10"},{"w":"7.5","r":"10"},{"w":"7.5","r":"10"}]},{"n":"Stiff - com barra solta","sets":[{"w":"42","r":"12"},{"w":"42","r":"12"},{"w":"42","r":"12"}]},{"n":"Supino reto - banco","sets":[{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"}]},{"n":"Afundo - Smith nas costas","sets":[{"w":"30","r":"10"},{"w":"30","r":"10"},{"w":"30","r":"10"}]},{"n":"Cadeira Flexora deitada","sets":[{"w":"27.5","r":"12"},{"w":"50","r":"12"},{"w":"50","r":"12"}]},{"n":"Supino Declinado - Smith ou Banco","sets":[{"w":"16","r":"10"},{"w":"16","r":"10"},{"w":"16","r":"10"}]}]},{"day":"D","date":"2026-04-10","exercises":[{"n":"Face Pull - Polia Corda","sets":[{"w":"5","r":"10"},{"w":"5","r":"16"},{"w":"5","r":"15"}]},{"n":"Desenvolvimento Militar (Máquina)","sets":[{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"}]},{"n":"Rosca martelo com halteres unitaleral em pé","sets":[{"w":"16","r":"12"},{"w":"16","r":"12"},{"w":"16","r":"12"}]},{"n":"Pulldown Machine","sets":[{"w":"45","r":"12"},{"w":"45","r":"10"},{"w":"45","r":"8"}]},{"n":"Elevação Lateral com Halteres","sets":[{"w":"10","r":"12"},{"w":"12","r":"12"},{"w":"12","r":"12"},{"w":"12","r":"12"}]},{"n":"Remada máquina","sets":[{"w":"45","r":"12"},{"w":"45","r":"12"},{"w":"45","r":"12"}]},{"n":"Rosca direta com barra W","sets":[{"w":"38","r":"12"},{"w":"38","r":"12"},{"w":"38","r":"12"}]}]},{"day":"A","date":"2026-04-14","exercises":[{"n":"Extensão Coxa - Máquina","sets":[{"w":"90","r":"10"},{"w":"92.5","r":"10"},{"w":"92.5","r":"10"}]},{"n":"Agachamento Goblet - Haltere","sets":[{"w":"26","r":"12"},{"w":"26","r":"12"},{"w":"26","r":"12"},{"w":"24","r":"12"},{"w":"24","r":"12"},{"w":"24","r":"12"}]},{"n":"Panturrilha","sets":[{"w":"45","r":"12"},{"w":"45","r":"15"},{"w":"45","r":"15"}]},{"n":"Hips Thrust - Máquina","sets":[{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"}]},{"n":"Abdução - máquina (sem descanso)","sets":[{"w":"122.5","r":"15"},{"w":"100","r":"15"},{"w":"77.5","r":"15"}]},{"n":"Leg Press","sets":[{"w":"180","r":"10"},{"w":"180","r":"10"},{"w":"180","r":"10"},{"w":"180","r":"10"}]}]},{"day":"B","date":"2026-04-15","exercises":[{"n":"Supino reto - banco","sets":[{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"}]},{"n":"Supino Declinado - Smith ou Banco","sets":[{"w":"18","r":"12"},{"w":"18","r":"12"},{"w":"18","r":"12"}]},{"n":"Overhead Triceps Extension - Corda","sets":[{"w":"18","r":"12"},{"w":"18","r":"12"}]}]},{"day":"C","date":"2026-04-17","exercises":[{"n":"Agachamento Búlgaro - Smith","sets":[{"w":"25","r":"10"},{"w":"25","r":"10"},{"w":"25","r":"10"}]},{"n":"Levantamento lateral - Polia","sets":[{"w":"7.5","r":"10"},{"w":"7.5","r":"9"},{"w":"7.5","r":"10"}]},{"n":"Stiff - com barra solta","sets":[{"w":"42","r":"12"},{"w":"42","r":"12"},{"w":"42","r":"12"}]},{"n":"Afundo - Smith nas costas","sets":[{"w":"30","r":"10"},{"w":"30","r":"10"},{"w":"30","r":"10"}]},{"n":"Cadeira Flexora deitada","sets":[{"w":"27.5","r":"12"},{"w":"50","r":"12"},{"w":"50","r":"12"}]}]},{"day":"B","date":"2026-04-19","exercises":[{"n":"Overhead Triceps Extension - Corda","sets":[{"w":"18","r":"12"},{"w":"18","r":"12"}]}]},{"day":"A","date":"2026-04-20","exercises":[{"n":"Extensão Coxa - Máquina","sets":[{"w":"92.5","r":"10"},{"w":"92.5","r":"10"},{"w":"92.5","r":"10"}]},{"n":"Panturrilha","sets":[{"w":"50","r":"12"},{"w":"50","r":"15"},{"w":"50","r":"15"}]},{"n":"Hips Thrust - Máquina","sets":[{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"}]},{"n":"Abdução - máquina (sem descanso)","sets":[{"w":"122.5","r":"15"},{"w":"100","r":"15"},{"w":"77.5","r":"15"}]},{"n":"Leg Press","sets":[{"w":"180","r":"10"},{"w":"180","r":"10"},{"w":"180","r":"10"},{"w":"180","r":"10"}]}]},{"day":"B","date":"2026-04-22","exercises":[{"n":"Supino reto - banco","sets":[{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"}]},{"n":"Supino Declinado - Smith ou Banco","sets":[{"w":"18","r":"12"},{"w":"18","r":"12"},{"w":"18","r":"12"}]},{"n":"Overhead Triceps Extension - Corda","sets":[{"w":"18","r":"12"},{"w":"18","r":"12"},{"w":"18","r":"12"}]}]},{"day":"C","date":"2026-04-23","exercises":[{"n":"Levantamento lateral - Polia","sets":[{"w":"7.5","r":"10"},{"w":"7.5","r":"9"},{"w":"7.5","r":"10"}]},{"n":"Stiff - com barra solta","sets":[{"w":"42","r":"12"},{"w":"42","r":"12"},{"w":"42","r":"12"}]},{"n":"Afundo - Smith nas costas","sets":[{"w":"30","r":"10"},{"w":"30","r":"10"},{"w":"30","r":"10"}]},{"n":"Cadeira Flexora deitada","sets":[{"w":"50","r":"12"},{"w":"50","r":"12"},{"w":"50","r":"12"}]}]},{"day":"D","date":"2026-04-24","exercises":[{"n":"Chute - Coice","sets":[{"w":"15","r":"12"},{"w":"15","r":"12"},{"w":"15","r":"12"}]},{"n":"Desenvolvimento Militar (Máquina)","sets":[{"w":"50","r":"12"},{"w":"50","r":"12"},{"w":"50","r":"12"}]},{"n":"Rosca martelo com halteres unitaleral em pé","sets":[{"w":"16","r":"12"},{"w":"16","r":"12"},{"w":"16","r":"12"}]},{"n":"Pulldown Machine","sets":[{"w":"45","r":"12"},{"w":"45","r":"12"},{"w":"45","r":"10"},{"w":"45","r":"10"}]},{"n":"Remada máquina","sets":[{"w":"45","r":"12"},{"w":"45","r":"12"},{"w":"45","r":"12"}]},{"n":"Rosca direta com barra W","sets":[{"w":"38","r":"12"},{"w":"38","r":"12"},{"w":"38","r":"10"}]}]},{"day":"A","date":"2026-04-27","exercises":[{"n":"Extensão Coxa - Máquina","sets":[{"w":"92.5","r":"10"},{"w":"92.5","r":"10"},{"w":"92.5","r":"10"}]},{"n":"Panturrilha","sets":[{"w":"45","r":"15"},{"w":"45","r":"15"},{"w":"45","r":"15"}]},{"n":"Hips Thrust - Máquina","sets":[{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"}]},{"n":"Leg Press","sets":[{"w":"180","r":"10"},{"w":"180","r":"10"},{"w":"180","r":"10"},{"w":"180","r":"10"}]}]},{"day":"B","date":"2026-04-28","exercises":[{"n":"Fly para baixo - polia","sets":[{"w":"13.75","r":"12"}]},{"n":"Supino Declinado - Smith ou Banco","sets":[{"w":"18","r":"12"},{"w":"18","r":"12"},{"w":"18","r":"12"}]},{"n":"Overhead Triceps Extension - Corda","sets":[{"w":"18","r":"12"},{"w":"18","r":"12"},{"w":"18","r":"12"}]}]},{"day":"B","date":"2026-04-29","exercises":[{"n":"V-Bar Extension","sets":[{"w":"21.25","r":"12"}]},{"n":"Supino reto - banco","sets":[{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"}]}]},{"day":"C","date":"2026-05-01","exercises":[{"n":"Chute - Coice","sets":[{"w":"15","r":"12"},{"w":"15","r":"12"},{"w":"15","r":"12"}]},{"n":"Levantamento lateral - Polia","sets":[{"w":"7.5","r":"10"},{"w":"7.5","r":"9"},{"w":"7.5","r":"10"}]},{"n":"Stiff - com barra solta","sets":[{"w":"42","r":"12"},{"w":"42","r":"12"},{"w":"42","r":"12"}]},{"n":"Elevação Lateral com Halteres","sets":[{"w":"12","r":"12"},{"w":"12","r":"12"},{"w":"12","r":"10"},{"w":"12","r":"12"}]},{"n":"Afundo - Smith nas costas","sets":[{"w":"30","r":"10"},{"w":"30","r":"10"},{"w":"30","r":"10"}]},{"n":"Cadeira Flexora deitada","sets":[{"w":"50","r":"8"},{"w":"50","r":"7"}]},{"n":"Extensão Costas Máquina","sets":[{"w":"95","r":"10"},{"w":"95","r":"10"},{"w":"95","r":"10"}]}]},{"day":"D","date":"2026-05-02","exercises":[{"n":"Desenvolvimento Militar (Máquina)","sets":[{"w":"50","r":"12"},{"w":"50","r":"12"},{"w":"50","r":"12"}]},{"n":"Rosca martelo com halteres unitaleral em pé","sets":[{"w":"16","r":"12"},{"w":"16","r":"12"},{"w":"16","r":"12"}]},{"n":"Pulldown Machine","sets":[{"w":"45","r":"12"},{"w":"45","r":"12"},{"w":"45","r":"10"},{"w":"45","r":"10"}]},{"n":"Remada máquina","sets":[{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"}]},{"n":"Rosca direta com barra W","sets":[{"w":"38","r":"12"},{"w":"38","r":"12"},{"w":"38","r":"10"}]}]},{"day":"A","date":"2026-05-06","exercises":[{"n":"Extensão Coxa - Máquina","sets":[{"w":"92.5","r":"10"},{"w":"92.5","r":"10"},{"w":"92.5","r":"10"}]},{"n":"Agachamento Goblet - Haltere","sets":[{"w":"26","r":"12"},{"w":"26","r":"12"},{"w":"26","r":"12"}]},{"n":"Panturrilha","sets":[{"w":"45","r":"15"},{"w":"45","r":"15"},{"w":"45","r":"15"}]},{"n":"Hips Thrust - Máquina","sets":[{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"}]},{"n":"Abdução - máquina (sem descanso)","sets":[{"w":"122.5","r":"15"},{"w":"100","r":"15"},{"w":"77.5","r":"15"}]},{"n":"Leg Press","sets":[{"w":"180","r":"10"},{"w":"180","r":"10"},{"w":"180","r":"10"},{"w":"180","r":"10"}]}]},{"day":"B","date":"2026-05-07","exercises":[{"n":"Supino reto - banco","sets":[{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"}]},{"n":"Supino Declinado - Smith ou Banco","sets":[{"w":"18","r":"10"},{"w":"18","r":"10"},{"w":"18","r":"10"}]},{"n":"Overhead Triceps Extension - Corda","sets":[{"w":"18","r":"12"},{"w":"18","r":"12"},{"w":"18","r":"12"}]}]},{"day":"C","date":"2026-05-08","exercises":[{"n":"Chute - Coice","sets":[{"w":"15","r":"12"},{"w":"15","r":"12"},{"w":"15","r":"12"}]},{"n":"Levantamento lateral - Polia","sets":[{"w":"8.75","r":"12"},{"w":"7.5","r":"12"},{"w":"7.5","r":"12"}]}]},{"day":"C","date":"2026-05-21","exercises":[{"n":"Chute - Coice","sets":[{"w":"15","r":"12"},{"w":"15","r":"12"},{"w":"15","r":"12"}]},{"n":"Levantamento lateral - Polia","sets":[{"w":"15","r":"12"}]},{"n":"Afundo - Smith nas costas","sets":[{"w":"30","r":"10"},{"w":"30","r":"10"}]}]},{"day":"A","date":"2026-05-23","exercises":[{"n":"Cadeira Flexora deitada","sets":[{"w":"50","r":"12"},{"w":"50","r":"12"},{"w":"50","r":"12"}]}]},{"day":"A","date":"2026-05-25","exercises":[{"n":"Extensão Coxa - Máquina","sets":[{"w":"95","r":"10"},{"w":"95","r":"10"},{"w":"95","r":"10"}]},{"n":"Agachamento Goblet - Haltere","sets":[{"w":"26","r":"12"},{"w":"26","r":"12"},{"w":"26","r":"12"}]},{"n":"Panturrilha","sets":[{"w":"45","r":"15"},{"w":"45","r":"15"},{"w":"45","r":"15"}]},{"n":"Hips Thrust - Máquina","sets":[{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"}]},{"n":"Abdução - máquina (sem descanso)","sets":[{"w":"130","r":"15"},{"w":"105","r":"15"},{"w":"80","r":"15"}]},{"n":"Leg Press","sets":[{"w":"200","r":"10"},{"w":"200","r":"10"},{"w":"200","r":"10"},{"w":"200","r":"10"}]}]},{"day":"B","date":"2026-05-26","exercises":[{"n":"Fly para baixo - polia","sets":[{"w":"13.75","r":"12"},{"w":"13.75","r":"12"},{"w":"13.75","r":"12"},{"w":"13.75","r":"12"}]},{"n":"Supino reto - banco","sets":[{"w":"55","r":"10"},{"w":"55","r":"10"},{"w":"55","r":"8"},{"w":"55","r":"8"}]}]},{"day":"C","date":"2026-05-27","exercises":[{"n":"Chute - Coice","sets":[{"w":"15","r":"12"},{"w":"15","r":"12"},{"w":"15","r":"12"}]},{"n":"Levantamento lateral - Polia","sets":[{"w":"7.4","r":"12"},{"w":"7.4","r":"12"},{"w":"7.4","r":"12"}]},{"n":"Stiff - com barra solta","sets":[{"w":"42","r":"12"},{"w":"42","r":"12"},{"w":"42","r":"12"}]},{"n":"Afundo - Smith nas costas","sets":[{"w":"30","r":"10"},{"w":"30","r":"10"}]},{"n":"Cadeira Flexora deitada","sets":[{"w":"50","r":"12"},{"w":"50","r":"12"},{"w":"50","r":"12"}]}]},{"day":"D","date":"2026-05-29","exercises":[{"n":"Desenvolvimento Militar (Máquina)","sets":[{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"}]},{"n":"Pulldown Machine","sets":[{"w":"45","r":"10"},{"w":"45","r":"10"},{"w":"45","r":"10"},{"w":"45","r":"10"}]},{"n":"Elevação Lateral com Halteres","sets":[{"w":"12","r":"10"},{"w":"12","r":"10"},{"w":"12","r":"10"},{"w":"12","r":"10"}]},{"n":"Remada máquina","sets":[{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"}]},{"n":"Rosca direta com barra W","sets":[{"w":"38","r":"12"},{"w":"38","r":"12"},{"w":"38","r":"12"}]}]},{"day":"A","date":"2026-06-01","exercises":[{"n":"Extensão Coxa - Máquina","sets":[{"w":"95","r":"10"},{"w":"95","r":"10"},{"w":"95","r":"10"}]},{"n":"Agachamento Goblet - Haltere","sets":[{"w":"26","r":"12"},{"w":"26","r":"12"},{"w":"26","r":"12"}]},{"n":"Panturrilha","sets":[{"w":"45","r":"15"},{"w":"45","r":"15"},{"w":"45","r":"15"}]},{"n":"Hips Thrust - Máquina","sets":[{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"},{"w":"90","r":"10"}]},{"n":"Abdução - máquina (sem descanso)","sets":[{"w":"130","r":"15"},{"w":"105","r":"15"},{"w":"80","r":"15"}]},{"n":"Leg Press","sets":[{"w":"200","r":"10"},{"w":"200","r":"10"},{"w":"200","r":"10"},{"w":"200","r":"10"}]}]},{"day":"B","date":"2026-06-02","exercises":[{"n":"V-Bar Extension","sets":[{"w":"25","r":"12"},{"w":"25","r":"12"},{"w":"25","r":"12"}]},{"n":"Fly para baixo - polia","sets":[{"w":"13.75","r":"10"},{"w":"13.75","r":"12"},{"w":"13.75","r":"12"},{"w":"13.75","r":"12"}]},{"n":"Supino reto - banco","sets":[{"w":"55","r":"10"},{"w":"55","r":"10"},{"w":"55","r":"10"},{"w":"55","r":"10"}]},{"n":"Supino Declinado - Smith ou Banco","sets":[{"w":"18","r":"10"},{"w":"18","r":"10"}]}]},{"day":"C","date":"2026-06-06","exercises":[{"n":"Agachamento Búlgaro - Smith","sets":[{"w":"25","r":"10"},{"w":"25","r":"10"},{"w":"25","r":"10"},{"w":"25","r":"10"},{"w":"25","r":"10"},{"w":"25","r":"10"},{"w":"25","r":"10"},{"w":"25","r":"10"},{"w":"25","r":"10"},{"w":"25","r":"10"},{"w":"25","r":"10"},{"w":"25","r":"10"}]},{"n":"Levantamento lateral - Polia","sets":[{"w":"10","r":"10"}]},{"n":"Stiff - com barra solta","sets":[{"w":"42","r":"12"},{"w":"42","r":"12"},{"w":"42","r":"10"}]},{"n":"Afundo - Smith nas costas","sets":[{"w":"30","r":"10"},{"w":"30","r":"10"},{"w":"30","r":"10"}]},{"n":"Cadeira Flexora deitada","sets":[{"w":"50","r":"12"},{"w":"50","r":"12"},{"w":"50","r":"12"}]}]},{"day":"D","date":"2026-06-10","exercises":[{"n":"Desenvolvimento Militar (Máquina)","sets":[{"w":"50","r":"12"},{"w":"50","r":"12"},{"w":"50","r":"12"},{"w":"50","r":"12"},{"w":"50","r":"10"},{"w":"50","r":"10"}]},{"n":"Pulldown Machine","sets":[{"w":"45","r":"12"},{"w":"45","r":"10"},{"w":"45","r":"10"},{"w":"45","r":"10"}]},{"n":"Elevação Lateral com Halteres","sets":[{"w":"12","r":"10"},{"w":"12","r":"10"},{"w":"12","r":"10"},{"w":"12","r":"10"}]},{"n":"Remada máquina","sets":[{"w":"50","r":"10"},{"w":"50","r":"10"},{"w":"50","r":"10"}]}]},{"day":"A","date":"2026-06-13","exercises":[{"n":"Extensão Coxa - Máquina","sets":[{"w":"90","r":"12"},{"w":"95","r":"10"},{"w":"95","r":"10"}]},{"n":"Agachamento Goblet - Haltere","sets":[{"w":"26","r":"12"},{"w":"26","r":"12"}]},{"n":"Hips Thrust - Máquina","sets":[{"w":"100","r":"10"},{"w":"100","r":"10"},{"w":"100","r":"10"},{"w":"100","r":"9"}]},{"n":"Abdução - máquina (sem descanso)","sets":[{"w":"130","r":"15"},{"w":"105","r":"15"},{"w":"80","r":"15"}]},{"n":"Leg Press","sets":[{"w":"200","r":"10"},{"w":"200","r":"10"},{"w":"200","r":"10"},{"w":"200","r":"10"}]}]},{"day":"B","date":"2026-06-16","exercises":[{"n":"V-Bar Extension","sets":[{"w":"26","r":"12"},{"w":"26","r":"12"},{"w":"26","r":"12"}]},{"n":"Supino reto - banco","sets":[{"w":"55","r":"10"},{"w":"55","r":"10"},{"w":"55","r":"10"},{"w":"55","r":"10"}]},{"n":"Supino Declinado - Smith ou Banco","sets":[{"w":"18","r":"10"},{"w":"18","r":"10"},{"w":"18","r":"10"}]}]},{"day":"C","date":"2026-06-17","exercises":[{"n":"Chute - Coice","sets":[{"w":"12.5","r":"10"}]},{"n":"Agachamento Búlgaro - Smith","sets":[{"w":"30","r":"10"},{"w":"30","r":"10"},{"w":"30","r":"10"}]},{"n":"Levantamento lateral - Polia","sets":[{"w":"10","r":"10"},{"w":"10","r":"10"},{"w":"10","r":"10"}]},{"n":"Stiff - com barra solta","sets":[{"w":"42","r":"12"},{"w":"42","r":"12"},{"w":"42","r":"10"}]},{"n":"Pulldown Machine","sets":[{"w":"50","r":"12"},{"w":"50","r":"12"},{"w":"50","r":"12"},{"w":"50","r":"12"}]},{"n":"Afundo - Smith nas costas","sets":[{"w":"30","r":"10"},{"w":"30","r":"10"},{"w":"30","r":"10"}]},{"n":"Remada máquina","sets":[{"w":"50","r":"10"},{"w":"50","r":"10"}]}]},{"day":"D","date":"2026-06-18","exercises":[{"n":"Elevação Lateral com Halteres","sets":[{"w":"12","r":"10"},{"w":"12","r":"10"},{"w":"12","r":"10"}]}]},{"day":"A","date":"2026-07-07","exercises":[{"n":"Extensão Coxa - Máquina","sets":[{"w":"90","r":"12"},{"w":"90","r":"12"},{"w":"90","r":"12"}]},{"n":"Agachamento Goblet - Haltere","sets":[{"w":"26","r":"10"},{"w":"26","r":"10"},{"w":"26","r":"10"}]},{"n":"Hips Thrust - Máquina","sets":[{"w":"100","r":"10"},{"w":"100","r":"10"},{"w":"100","r":"10"},{"w":"100","r":"10"}]},{"n":"Abdução - máquina (sem descanso)","sets":[{"w":"130","r":"15"},{"w":"105","r":"15"},{"w":"80","r":"15"}]},{"n":"Leg Press","sets":[{"w":"200","r":"10"},{"w":"200","r":"10"},{"w":"200","r":"10"},{"w":"200","r":"10"}]}]}];
 let templates = load(K.tpl, null) || DEFAULT_TEMPLATES;
-let sessions  = load(K.sess, null);
-if(sessions===null){sessions=(typeof SEED_SESSIONS!=="undefined")?SEED_SESSIONS.map(s=>({...s})):[];save(K.sess,sessions);}
+let sessions  = load(K.sess, []);
 let active    = load(K.active, null);
 let cfg       = load(K.cfg, {ciclo:"C4", plano:"ABCD", musicUrl:""});
 let tab = active ? "log" : "home";
@@ -166,6 +181,9 @@ const esc = s=>String(s).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"
 function today(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("on");clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove("on"),1600);}
 function setVol(sets){return sets.reduce((a,s)=>a+(parseFloat(s.w)||0)*(parseFloat(s.r)||0),0);}
+function targetSets(e){const m=String(e.sr||"").match(/^\s*(\d+)/);return m?+m[1]:0;}
+function completedSets(e){return e.sets.filter(s=>s.r!==""&&s.r!=null).length;}
+const INTER_REST=120; // descanso padrão entre exercícios (2min)
 function topWeight(sets){return sets.reduce((a,s)=>Math.max(a,parseFloat(s.w)||0),0);}
 function fmtClock(ts){if(!ts)return"--:--";const d=new Date(ts);return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");}
 function durMin(s){if(!s.started||!s.finished)return null;return Math.max(1,Math.round((s.finished-s.started)/60000));}
@@ -173,28 +191,39 @@ function fmtDur(ms){const t=Math.max(0,Math.floor(ms/1000));const h=Math.floor(t
   return (h?h+":"+String(m).padStart(2,"0"):m)+":"+String(sec).padStart(2,"0");}
 let elapsedId=null;
 function startElapsed(){clearInterval(elapsedId);
-  const tick=()=>{const e=$("#elapsed");if(!e||!active){clearInterval(elapsedId);return;}e.textContent=fmtDur(Date.now()-active.started);};
+  const tick=()=>{const e=$("#sbElapsed");if(!e||!active){clearInterval(elapsedId);return;}e.textContent=fmtDur(Date.now()-active.started);};
   tick();elapsedId=setInterval(tick,1000);}
+function refreshSbIdle(){if(!active)return;const p=$("#sbProg"),v=$("#sbVol");
+  const done=active.exercises.filter(e=>e.sets.length).length;
+  if(p)p.textContent=done+"/"+active.exercises.length+" ex";
+  if(v)v.textContent=Math.round(sessVol(active))+" kg·rep";}
+function updateSessionBar(){const sb=$("#sessionbar");if(!sb)return;
+  if(tab==="log"&&active){sb.classList.add("on");refreshSbIdle();startElapsed();}
+  else{sb.classList.remove("on","resting");clearInterval(swId);clearInterval(elapsedId);}}
 function openMusic(){if(!cfg.musicUrl){toast("Configure a playlist em Ajustes");go("cfg");return;}
   window.open(cfg.musicUrl,"_blank");}
 function openExDemo(name){window.open("https://www.google.com/search?tbm=isch&q="+encodeURIComponent(name+" exercício execução academia"),"_blank");}
 
 /* ============ CRONÔMETRO DE DESCANSO (conta pra cima, grava a pausa real) ============ */
 let swId=null, swStart=0, swTarget=0, swExIdx=-1, swBeeped=false;
-function startRest(exIdx){swExIdx=exIdx;swStart=Date.now();swTarget=(active.exercises[exIdx]||{}).rest||0;swBeeped=false;
-  const tg=$("#timerTgt");if(tg)tg.textContent=swTarget?"(meta "+swTarget+"s)":"";
-  $("#timer").classList.add("on");swTick();clearInterval(swId);swId=setInterval(swTick,250);}
+function startRest(exIdx){const e=active.exercises[exIdx]||{};swExIdx=exIdx;swStart=Date.now();swBeeped=false;
+  const inter=targetSets(e)&&completedSets(e)>=targetSets(e);
+  swTarget=inter?INTER_REST:(e.rest||0);
+  const lb=$("#sbRestLbl");if(lb)lb.textContent=inter?"ENTRE EXERCÍCIOS":"DESCANSO";
+  const tg=$("#sbRestTgt");if(tg)tg.textContent=swTarget?"(meta "+(inter?"2min":swTarget+"s")+")":"";
+  const sb=$("#sessionbar");if(sb){sb.classList.add("on","resting");}swTick();clearInterval(swId);swId=setInterval(swTick,250);}
 function swTick(){const sec=Math.floor((Date.now()-swStart)/1000);
-  const el2=$("#timerT");if(el2){el2.textContent=Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0");
-    el2.style.color=(swTarget&&sec>=swTarget)?"#fca5a5":"#fff";}
+  const e2=$("#sbRestT");if(e2)e2.textContent=Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0");
   if(swTarget&&sec>=swTarget&&!swBeeped){swBeeped=true;beep();}}
 function markLap(){const sec=Math.round((Date.now()-swStart)/1000);
   const e=active.exercises[swExIdx];
   if(e){if(e.sets.length){const ls=e.sets[e.sets.length-1];ls.rest=sec;ls.t=Date.now();}
-    const last=e.sets[e.sets.length-1]||{};e.sets.push({w:last.w||"",r:last.r||"",rir:last.rir||""});persistActive();}
+    if(targetSets(e)&&completedSets(e)>=targetSets(e)){e.done=true;e.open=false;} // alvo atingido → conclui exercício
+    else{const last=e.sets[e.sets.length-1]||{};e.sets.push({w:last.w||"",r:last.r||"",rir:last.rir||""});}
+    persistActive();}
   stopRest();render();
-  toast("Descanso "+sec+"s registrado");}
-function stopRest(){clearInterval(swId);$("#timer").classList.remove("on");}
+  toast(sec+"s registrado");}
+function stopRest(){clearInterval(swId);const sb=$("#sessionbar");if(sb)sb.classList.remove("resting");}
 function beep(){try{const c=new(window.AudioContext||window.webkitAudioContext)();const o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;g.gain.value=.1;o.start();setTimeout(()=>{o.stop();c.close();},400);}catch(e){}
   if(navigator.vibrate)navigator.vibrate([200,80,200]);}
 
@@ -209,11 +238,12 @@ function renderTabs(){
 
 /* ============ RENDER ROUTER ============ */
 function render(){renderTabs();const a=$("#app");a.innerHTML="";
-  if(tab==="log"&&active) return renderLog(a);
-  if(tab==="home") return renderHome(a);
-  if(tab==="hist") return renderHist(a);
-  if(tab==="cfg")  return renderCfg(a);
-  renderHome(a);
+  if(tab==="log"&&active) renderLog(a);
+  else if(tab==="home") renderHome(a);
+  else if(tab==="hist") renderHist(a);
+  else if(tab==="cfg")  renderCfg(a);
+  else renderHome(a);
+  updateSessionBar();
 }
 
 /* ---------- HOME ---------- */
@@ -273,17 +303,11 @@ function renderLog(a){
   head.appendChild(music);
   a.appendChild(head);
 
-  // progress + live duration
-  const doneEx=active.exercises.filter(e=>e.sets.length).length;
-  const pv=el("div","card");pv.style.padding="10px 14px";
-  pv.innerHTML="<div class='row' style='justify-content:space-between'>"+
-    "<span class='muted'>⏱ <b id='elapsed' style='color:var(--text)'>0:00</b> · início "+fmtClock(active.started)+"</span>"+
-    "<span class='muted'>"+doneEx+"/"+active.exercises.length+" ex · "+Math.round(sessVol(active))+" kg·rep</span></div>";
-  a.appendChild(pv);
-  a.appendChild(el("div","muted","Cada série: <b>kg</b> · <b>reps</b> · <b>RIR</b> (reps em reserva). Preencha a série → <b>▶ Descanso</b> conta a pausa → <b>🏁 Próxima série</b> grava a pausa e cria a próxima. 🔍 mostra o exercício."));
-  startElapsed();
+  a.appendChild(el("div","muted","Preencha a série → <b>▶ Descanso</b> conta a pausa → <b>🏁 Próxima</b> grava a pausa e cria a próxima. <b>RIR</b> = reps em reserva. 🔍 mostra o exercício. O tempo total fica sempre na barra de baixo."));
 
-  active.exercises.forEach((e,ei)=>a.appendChild(exCard(e,ei)));
+  // feitos vão pro fim da lista (ordem estável)
+  const order=active.exercises.map((e,i)=>i).sort((x,y)=>(active.exercises[x].done?1:0)-(active.exercises[y].done?1:0));
+  order.forEach(i=>a.appendChild(exCard(active.exercises[i],i)));
 
   const addBtn=el("button","btn-ghost","+ Adicionar exercício");addBtn.style.width="100%";addBtn.style.marginBottom="12px";
   addBtn.onclick=()=>{const n=prompt("Nome do exercício:");if(!n)return;active.exercises.push({n,sr:"3×10",rest:60,mvw:false,notes:"",sets:[]});persistActive();render();};
@@ -295,7 +319,7 @@ function renderLog(a){
   disc.onclick=()=>{if(confirm("Descartar este treino? Os dados não serão salvos."))
     {active=null;localStorage.removeItem(K.active);go("home");}};
   a.appendChild(disc);
-  a.appendChild(el("div",null,"<div style='height:60px'></div>"));
+  a.appendChild(el("div",null,"<div style='height:110px'></div>"));
 }
 
 function exerciseHistory(name){
@@ -318,13 +342,23 @@ function trendChip(H){if(H.length<2)return"";const d=Math.round((H[0].top-H[1].t
   return"<span class='trend eq'>= manteve</span>";}
 
 function exCard(e,ei){
+  // estado concluído e recolhido
+  if(e.done&&!e.open){
+    const d=el("div","exdone");
+    const doneSets=e.sets.filter(s=>s.r!==""&&s.r!=null);
+    d.innerHTML="<span class='ck'>✓</span><span class='nm'>"+esc(e.n)+"</span><span class='sm'>"+summarizeSets(doneSets)+"</span>";
+    d.onclick=()=>{e.open=true;persistActive();render();};
+    return d;
+  }
   const c=el("div","ex");
   const head=el("div","ex-head");
-  head.innerHTML="<div><span class='ex-title'>"+esc(e.n)+"</span>"+(e.mvw?"<span class='tag mvw'>🔑 MVW</span>":"")+
+  head.innerHTML="<div><span class='ex-title'>"+esc(e.n)+"</span>"+(e.mvw?"<span class='tag mvw'>🔑 MVW</span>":"")+(e.done?"<span class='tag' style='background:rgba(34,197,94,.15);color:var(--accent)'>✓ feito</span>":"")+
     "<div class='muted'>alvo "+esc(e.sr)+" · desc "+e.rest+"s</div></div>";
+  const doneBtn=el("button","btn-ghost btn-sm",e.done?"▴":"✓");doneBtn.title=e.done?"Recolher":"Marcar como feito";doneBtn.style.flex="0 0 auto";
+  doneBtn.onclick=()=>{e.done=true;e.open=false;persistActive();render();};
   const demo=el("button","btn-ghost btn-sm","🔍");demo.title="Ver exercício";demo.style.flex="0 0 auto";
   demo.onclick=()=>openExDemo(e.n);
-  head.appendChild(demo);
+  head.appendChild(doneBtn);head.appendChild(demo);
   c.appendChild(head);
 
   // miniatura opcional (imagem própria colada nos Ajustes)
@@ -370,8 +404,9 @@ function exCard(e,ei){
     c.appendChild(el("div","muted","⏱ pausas: "+rests.map(r=>r+"s").join(" · ")+" · méd "+avg+"s"));}
 
   const bar=el("div","row");bar.style.marginTop="6px";
-  const add=el("button","btn-ghost btn-sm","+ Série");
-  add.onclick=()=>{const last=e.sets[e.sets.length-1]||{};e.sets.push({w:last.w||"",r:last.r||"",rir:last.rir||""});persistActive();render();};
+  const reached=targetSets(e)&&completedSets(e)>=targetSets(e);
+  const add=el("button","btn-ghost btn-sm",reached?"+ Série extra":"+ Série");
+  add.onclick=()=>{const last=e.sets[e.sets.length-1]||{};e.sets.push({w:last.w||"",r:last.r||"",rir:last.rir||""});e.done=false;persistActive();render();};
   const rest=el("button","btn-blue btn-sm","▶ Descanso");rest.onclick=()=>startRest(ei);
   bar.appendChild(add);bar.appendChild(rest);
   const vol=el("div","muted");vol.style.marginLeft="auto";vol.dataset.vol="1";vol.textContent=Math.round(setVol(e.sets))+" kg·rep";
@@ -393,7 +428,7 @@ function lastLogFor(name,day){
 }
 
 function finishSession(){
-  const withSets={...active,exercises:active.exercises.filter(e=>e.sets.length)};
+  const withSets={...active,exercises:active.exercises.filter(e=>e.sets.length).map(({done,open,...e})=>e)};
   if(!withSets.exercises.length){toast("Registre ao menos uma série");return;}
   withSets.finished=Date.now();
   // carimba série sem timestamp (última de cada exercício / adicionadas manualmente)
