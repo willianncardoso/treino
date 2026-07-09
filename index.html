@@ -190,7 +190,7 @@ function swTick(){const sec=Math.floor((Date.now()-swStart)/1000);
   if(swTarget&&sec>=swTarget&&!swBeeped){swBeeped=true;beep();}}
 function markLap(){const sec=Math.round((Date.now()-swStart)/1000);
   const e=active.exercises[swExIdx];
-  if(e){if(e.sets.length)e.sets[e.sets.length-1].rest=sec;
+  if(e){if(e.sets.length){const ls=e.sets[e.sets.length-1];ls.rest=sec;ls.t=Date.now();}
     const last=e.sets[e.sets.length-1]||{};e.sets.push({w:last.w||"",r:last.r||"",rir:last.rir||""});persistActive();}
   stopRest();render();
   toast("Descanso "+sec+"s registrado");}
@@ -396,6 +396,8 @@ function finishSession(){
   const withSets={...active,exercises:active.exercises.filter(e=>e.sets.length)};
   if(!withSets.exercises.length){toast("Registre ao menos uma série");return;}
   withSets.finished=Date.now();
+  // carimba série sem timestamp (última de cada exercício / adicionadas manualmente)
+  withSets.exercises.forEach(e=>e.sets.forEach(st=>{if(!st.t)st.t=withSets.finished;}));
   sessions.push(withSets);save(K.sess,sessions);
   active=null;localStorage.removeItem(K.active);
   toast("Treino salvo ✓");
@@ -578,6 +580,55 @@ function renderCfg(a){
   rst.onclick=()=>{if(confirm("Restaurar os 4 treinos padrão? (histórico é preservado)")){templates=JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));save(K.tpl,templates);toast("Restaurado");render();}};
   c3.appendChild(rst);
   a.appendChild(c3);
+
+  // análise / Apple Health
+  const c4=el("div","card");
+  c4.appendChild(el("h3",null,"📊 Análise (desktop / Apple Health)"));
+  c4.appendChild(el("div","muted","JSON canônico com horário de cada série (ISO), pronto pra cruzar com o export do Apple Watch. Salve como <b>treinos.json</b> na pasta <b>54.01 Academia/_dados/</b> do seu vault — o iCloud sincroniza pro Mac e eu leio na consolidação."));
+  const ax=el("button","btn-primary btn-sm","⬇ treinos.json (análise)");ax.style.marginTop="8px";
+  ax.onclick=()=>download("treinos.json",JSON.stringify(analysisExport(),null,2),"application/json");
+  c4.appendChild(ax);
+  a.appendChild(c4);
+}
+
+/* ---------- EXPORT CANÔNICO (schema gymlog/v1) ---------- */
+function isoTs(ts){return ts?new Date(ts).toISOString():null;}
+function numOrNull(v){if(v==null||v==="")return null;const n=Number(v);return isNaN(n)?null:n;}
+function analysisExport(){
+  return {
+    schema:"gymlog/v1",
+    exportedAt:new Date().toISOString(),
+    athlete:"Will",
+    cfg:{ciclo:cfg.ciclo,plano:cfg.plano},
+    sessions:sessions.map(s=>({
+      day:s.day,
+      dayName:(templates[s.day]&&templates[s.day].name)||null,
+      date:s.date,
+      startedAt:isoTs(s.started),
+      finishedAt:isoTs(s.finished),
+      durationMin:durMin(s),
+      exercises:s.exercises.map(e=>({
+        name:e.n,
+        mvw:!!e.mvw,
+        target:e.sr||null,
+        sets:e.sets.map((st,i)=>({
+          index:i+1,
+          weightKg:numOrNull(st.w),
+          reps:numOrNull(st.r),
+          rir:numOrNull(st.rir),
+          restSec:st.rest!=null?st.rest:null,
+          completedAt:isoTs(st.t)
+        })),
+        volumeKgRep:Math.round(setVol(e.sets)),
+        topWeightKg:topWeight(e.sets)
+      })),
+      totals:{
+        volumeKgRep:Math.round(sessVol(s)),
+        restTotalSec:s.exercises.reduce((a,e)=>a+e.sets.reduce((b,x)=>b+(x.rest||0),0),0),
+        sets:s.exercises.reduce((a,e)=>a+e.sets.length,0)
+      }
+    }))
+  };
 }
 
 function editTemplate(d){
