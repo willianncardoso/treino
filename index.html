@@ -96,49 +96,55 @@ a{color:var(--accent2)}
 <script>
 "use strict";
 /* ============ STORE ============ */
-const K = {tpl:"gymlog_templates_v1", sess:"gymlog_sessions_v1", active:"gymlog_active_v1", cfg:"gymlog_cfg_v1"};
+const K = {tpl:"gymlog_templates_v2", sess:"gymlog_sessions_v1", active:"gymlog_active_v1", cfg:"gymlog_cfg_v1"};
 const load = (k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}};
 const save = (k,v)=>localStorage.setItem(k,JSON.stringify(v));
 
+/* Templates extraídos do vault Obsidian: 54.01 Academia (treino-atual) */
 const DEFAULT_TEMPLATES = {
-  A:{name:"Inferior / Glúteo máx", ex:[
-    {n:"Agachamento Livre", sr:"4×8", rest:120, mvw:true, notes:""},
-    {n:"Hip Thrust", sr:"4×10", rest:90, mvw:true, notes:""},
-    {n:"Leg Press 45", sr:"3×12", rest:90, mvw:false, notes:""},
-    {n:"Cadeira Flexora", sr:"3×12", rest:60, mvw:false, notes:""},
-    {n:"Elevação Pélvica Unilateral", sr:"3×12", rest:60, mvw:false, notes:"cada lado"},
-    {n:"Panturrilha em Pé", sr:"4×15", rest:45, mvw:false, notes:""},
+  A:{name:"Pernas & Glúteos I", ex:[
+    {n:"Hips Thrust - Máquina", sr:"4x12", rest:90, mvw:true, notes:"Principal — carga pesada, squeeze topo 2s"},
+    {n:"Agachamento Frontal - Barra Solta", sr:"3x10", rest:120, mvw:false, notes:"Profundo, excêntrico 3s"},
+    {n:"Leg Press", sr:"4x12", rest:90, mvw:false, notes:"Pés altos e afastados (glúteo)"},
+    {n:"Extensão Coxa - Máquina", sr:"3x12", rest:60, mvw:false, notes:"Contração no topo"},
+    {n:"Abdução - máquina (sem descanso)", sr:"3x15", rest:0, mvw:false, notes:"Drop set"},
+    {n:"Panturrilha", sr:"4x15", rest:45, mvw:false, notes:"Pausa embaixo"},
+    {n:"Abdomen - máquina", sr:"3x12", rest:60, mvw:false, notes:""},
+    {n:"Bike", sr:"10-15 min", rest:0, mvw:false, notes:"Cardio pós, FC 130-140"},
   ]},
-  B:{name:"Push / Peito + Tríceps", ex:[
-    {n:"Supino Reto", sr:"4×8", rest:120, mvw:true, notes:""},
-    {n:"Supino Inclinado Halteres", sr:"3×10", rest:90, mvw:false, notes:""},
-    {n:"Crossover", sr:"3×12", rest:60, mvw:false, notes:"foco peito inferior"},
-    {n:"Desenvolvimento Militar", sr:"3×10", rest:90, mvw:false, notes:""},
-    {n:"Tríceps Corda", sr:"3×12", rest:60, mvw:false, notes:""},
-    {n:"Tríceps Testa", sr:"3×12", rest:60, mvw:false, notes:""},
+  B:{name:"Peito & Tríceps", ex:[
+    {n:"Supino reto - banco", sr:"4x10", rest:120, mvw:true, notes:"Principal — progressão de carga"},
+    {n:"Fly para baixo - polia", sr:"4x12", rest:60, mvw:true, notes:"⭐ CHAVE peito inferior"},
+    {n:"Supino Inclinado - banco", sr:"3x10", rest:90, mvw:false, notes:"30°"},
+    {n:"Dips", sr:"3x10-12", rest:90, mvw:false, notes:"Tronco à frente = peito inferior"},
+    {n:"Crucifixo banco", sr:"3x12", rest:60, mvw:false, notes:"Banco reto/decline"},
+    {n:"V-Bar Extension", sr:"3x12", rest:60, mvw:false, notes:""},
+    {n:"Extensão tríceps maquina", sr:"3x12", rest:60, mvw:false, notes:""},
   ]},
-  C:{name:"Pull / Costas + Ombro + Bíceps", ex:[
-    {n:"Puxada Alta", sr:"4×8", rest:120, mvw:true, notes:""},
-    {n:"Remada Curvada", sr:"4×10", rest:90, mvw:true, notes:""},
-    {n:"Remada Baixa", sr:"3×12", rest:60, mvw:false, notes:""},
-    {n:"Face Pull", sr:"3×15", rest:60, mvw:false, notes:""},
-    {n:"Rosca Direta", sr:"3×12", rest:60, mvw:false, notes:""},
-    {n:"Rosca Martelo", sr:"3×12", rest:60, mvw:false, notes:""},
+  C:{name:"Pernas & Glúteos II", ex:[
+    {n:"Stiff - com barra solta", sr:"4x10", rest:120, mvw:true, notes:"Principal — stretch no glúteo, não na lombar"},
+    {n:"Agachamento Búlgaro - Smith", sr:"3x10 (cada perna)", rest:90, mvw:false, notes:"Passo longo, tronco inclinado"},
+    {n:"Afundo - Smith nas costas", sr:"3x10 (cada perna)", rest:90, mvw:false, notes:"Passo longo, descer profundo"},
+    {n:"Posterior Coxa - dumbell tapete", sr:"3x12", rest:60, mvw:false, notes:"Squeeze no topo"},
+    {n:"Levantamento lateral - Polia", sr:"3x15 (cada perna)", rest:45, mvw:false, notes:"Glúteo médio (formato redondo)"},
+    {n:"Chute - Coice", sr:"3x12 (cada perna)", rest:45, mvw:false, notes:"Hiperextensão do quadril"},
+    {n:"Extensão Costas Máquina", sr:"3x12", rest:60, mvw:false, notes:"Glúteos + lombar"},
   ]},
-  D:{name:"Cadeia posterior + Core", ex:[
-    {n:"Terra Romeno", sr:"4×8", rest:120, mvw:true, notes:""},
-    {n:"Stiff", sr:"3×10", rest:90, mvw:false, notes:""},
-    {n:"Mesa Flexora", sr:"3×12", rest:60, mvw:false, notes:""},
-    {n:"Extensão Lombar", sr:"3×15", rest:60, mvw:false, notes:""},
-    {n:"Prancha", sr:"3×45s", rest:45, mvw:true, notes:"segundos"},
-    {n:"Abdominal Infra", sr:"3×15", rest:45, mvw:false, notes:""},
+  D:{name:"Costas, Ombros & Bíceps", ex:[
+    {n:"Desenvolvimento Militar (Máquina)", sr:"4x10", rest:120, mvw:true, notes:"Principal ombro — carga progressiva"},
+    {n:"Pulldown Machine", sr:"4x10", rest:90, mvw:false, notes:"Squeeze nas escápulas"},
+    {n:"Remada máquina", sr:"3x10", rest:90, mvw:false, notes:"Retração escapular"},
+    {n:"Elevação Lateral com Halteres", sr:"4x12", rest:60, mvw:false, notes:"Deltóide lateral"},
+    {n:"Rosca direta com barra W", sr:"3x12", rest:60, mvw:false, notes:""},
+    {n:"Rosca martelo com halteres unitaleral em pé", sr:"3x12", rest:60, mvw:false, notes:"Braquial"},
+    {n:"Adbomen - Cadeira Inclinada", sr:"3x20", rest:45, mvw:false, notes:""},
   ]},
 };
 
 let templates = load(K.tpl, null) || DEFAULT_TEMPLATES;
 let sessions  = load(K.sess, []);
 let active    = load(K.active, null);
-let cfg       = load(K.cfg, {ciclo:"C4", plano:"ABCD"});
+let cfg       = load(K.cfg, {ciclo:"C4", plano:"ABCD", musicUrl:""});
 let tab = active ? "log" : "home";
 
 /* ============ HELPERS ============ */
@@ -149,6 +155,16 @@ function today(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("on");clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove("on"),1600);}
 function setVol(sets){return sets.reduce((a,s)=>a+(parseFloat(s.w)||0)*(parseFloat(s.r)||0),0);}
 function topWeight(sets){return sets.reduce((a,s)=>Math.max(a,parseFloat(s.w)||0),0);}
+function fmtClock(ts){if(!ts)return"--:--";const d=new Date(ts);return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");}
+function durMin(s){if(!s.started||!s.finished)return null;return Math.max(1,Math.round((s.finished-s.started)/60000));}
+function fmtDur(ms){const t=Math.max(0,Math.floor(ms/1000));const h=Math.floor(t/3600),m=Math.floor((t%3600)/60),sec=t%60;
+  return (h?h+":"+String(m).padStart(2,"0"):m)+":"+String(sec).padStart(2,"0");}
+let elapsedId=null;
+function startElapsed(){clearInterval(elapsedId);
+  const tick=()=>{const e=$("#elapsed");if(!e||!active){clearInterval(elapsedId);return;}e.textContent=fmtDur(Date.now()-active.started);};
+  tick();elapsedId=setInterval(tick,1000);}
+function openMusic(){if(!cfg.musicUrl){toast("Configure a playlist em Ajustes");go("cfg");return;}
+  window.open(cfg.musicUrl,"_blank");}
 
 /* ============ TIMER ============ */
 let timerId=null, timerLeft=0;
@@ -207,7 +223,7 @@ function renderHome(a){
     const c=el("div","card");
     sessions.slice(-5).reverse().forEach(s=>{
       const r=el("div","sess");
-      r.innerHTML="<div class='row'><span class='dot'>"+s.day+"</span><div><div style='font-weight:600'>"+esc(templates[s.day]?templates[s.day].name:s.day)+"</div><div class='muted'>"+s.date+" · "+Math.round(sessVol(s))+" kg·rep</div></div></div>";
+      r.innerHTML="<div class='row'><span class='dot'>"+s.day+"</span><div><div style='font-weight:600'>"+esc(templates[s.day]?templates[s.day].name:s.day)+"</div><div class='muted'>"+s.date+" · "+Math.round(sessVol(s))+" kg·rep"+(durMin(s)?" · "+durMin(s)+" min":"")+"</div></div></div>";
       const v=el("button","btn-ghost btn-sm","MD");v.onclick=()=>showMarkdown(s);
       r.appendChild(v);c.appendChild(r);
     });
@@ -231,13 +247,18 @@ function renderLog(a){
   const t=templates[active.day];
   const head=el("div","row");
   head.innerHTML="<div style='flex:1'><h1>Treino "+active.day+"</h1><div class='muted'>"+esc(t.name)+" · "+active.date+"</div></div>";
+  const music=el("button","btn-ghost btn-sm","🎵");music.title="Música";music.onclick=openMusic;
+  head.appendChild(music);
   a.appendChild(head);
 
-  // progress
+  // progress + live duration
   const doneEx=active.exercises.filter(e=>e.sets.length).length;
   const pv=el("div","card");pv.style.padding="10px 14px";
-  pv.innerHTML="<div class='row' style='justify-content:space-between'><span class='muted'>"+doneEx+"/"+active.exercises.length+" exercícios · vol "+Math.round(sessVol(active))+" kg·rep</span></div>";
+  pv.innerHTML="<div class='row' style='justify-content:space-between'>"+
+    "<span class='muted'>⏱ <b id='elapsed' style='color:var(--text)'>0:00</b> · início "+fmtClock(active.started)+"</span>"+
+    "<span class='muted'>"+doneEx+"/"+active.exercises.length+" ex · "+Math.round(sessVol(active))+" kg·rep</span></div>";
   a.appendChild(pv);
+  startElapsed();
 
   active.exercises.forEach((e,ei)=>a.appendChild(exCard(e,ei)));
 
@@ -309,7 +330,9 @@ function finishSession(){
 /* ---------- MARKDOWN EXPORT ---------- */
 function sessionMarkdown(s){
   const t=templates[s.day];const name=t?t.name:s.day;
-  let md="---\ntags: [treino]\nPlano: "+(s.plano||cfg.plano)+"\nCiclo: "+(s.ciclo||cfg.ciclo)+"\nInício: "+s.date+"\n---\n\n";
+  const dmy=durMin(s);
+  let md="---\ntags: [treino]\nPlano: "+(s.plano||cfg.plano)+"\nCiclo: "+(s.ciclo||cfg.ciclo)+"\nInício: "+s.date+
+    (s.started?"\nHora: "+fmtClock(s.started):"")+(dmy?"\nDuração: "+dmy:"")+"\n---\n\n";
   md+="# Treino "+s.day+" — "+name+" ("+s.date+")\n\n";
   md+="| Ordem | Exercício | Séries×Reps | Descanso | Notas |\n";
   md+="|-------|-----------|-------------|----------|-------|\n";
@@ -320,6 +343,8 @@ function sessionMarkdown(s){
     md+="| "+(i+1)+" | [["+e.n+"]]"+(e.mvw?" 🔑":"")+" | "+sets+" | "+e.rest+"s | "+note+" |\n";
   });
   md+="\n**Volume total:** "+Math.round(sessVol(s))+" kg·rep\n";
+  const dm=durMin(s);
+  if(dm)md+="**Duração:** "+dm+" min ("+fmtClock(s.started)+"–"+fmtClock(s.finished)+")\n";
   return md;
 }
 function showMarkdown(s){
@@ -378,7 +403,7 @@ function renderHist(a){
   sessions.filter(s=>s.exercises.some(e=>e.n===histEx)).reverse().forEach(s=>{
     const ex=s.exercises.find(e=>e.n===histEx);
     const r=el("div","sess");
-    r.innerHTML="<div><div style='font-weight:600'>"+s.date+" <span class='muted'>("+s.day+")</span></div><div class='muted'>"+ex.sets.map(st=>(st.w||"?")+"×"+(st.r||"?")).join(" · ")+"</div></div>";
+    r.innerHTML="<div><div style='font-weight:600'>"+s.date+" <span class='muted'>("+s.day+")"+(durMin(s)?" · "+durMin(s)+"min":"")+"</span></div><div class='muted'>"+ex.sets.map(st=>(st.w||"?")+"×"+(st.r||"?")).join(" · ")+"</div></div>";
     dc.appendChild(r);
   });
   a.appendChild(dc);
@@ -425,6 +450,17 @@ function renderCfg(a){
   const b2=el("div");b2.appendChild(el("label","fld","Plano"));b2.appendChild(pl);
   g.appendChild(b1);g.appendChild(b2);c1.appendChild(g);
   a.appendChild(c1);
+
+  // music
+  const cm=el("div","card");
+  cm.appendChild(el("h3",null,"🎵 Playlist (Apple Music)"));
+  cm.appendChild(el("div","muted","Cole o link de compartilhamento da sua playlist Gym 2026. No iPhone, abrir o link chama o app Música."));
+  const mu=el("input");mu.type="url";mu.placeholder="https://music.apple.com/...";mu.style.textAlign="left";mu.style.marginTop="8px";
+  mu.value=cfg.musicUrl||"";mu.oninput=()=>{cfg.musicUrl=mu.value.trim();save(K.cfg,cfg);};
+  cm.appendChild(mu);
+  const tb=el("button","btn-ghost btn-sm","▶ Testar abrir");tb.style.marginTop="8px";tb.onclick=openMusic;
+  cm.appendChild(tb);
+  a.appendChild(cm);
 
   // edit templates
   const c2=el("div","card");
