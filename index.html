@@ -86,6 +86,10 @@ label.fld{display:block;font-size:11px;color:var(--muted);text-align:center;marg
 .sb-t{font-size:22px;font-weight:750;font-variant-numeric:tabular-nums;line-height:1.05}
 .sb-lbl{font-size:10px;letter-spacing:.5px;color:var(--muted)}
 .sb-rest .sb-lbl{color:rgba(255,255,255,.8)}
+.sessionbar.resting.over .sb-inner{background:var(--danger);animation:pulseOver 1s ease-in-out infinite}
+@keyframes pulseOver{0%,100%{box-shadow:0 6px 22px rgba(239,68,68,.5)}50%{box-shadow:0 6px 30px rgba(239,68,68,.85)}}
+.ex.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 4px 16px rgba(34,197,94,.12)}
+.ex.active .ex-title::before{content:"▶ ";color:var(--accent);font-size:12px}
 .sess{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--border)}
 .sess:last-child{border-bottom:none}
 .dot{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;background:var(--surface2)}
@@ -113,9 +117,12 @@ a{color:var(--accent2)}
     </div>
     <div class="sb-rest">
       <div><div class="sb-lbl"><span id="sbRestLbl">DESCANSO</span> <span id="sbRestTgt"></span></div><div class="sb-t" id="sbRestT" style="color:#fff">0:00</div></div>
-      <div class="row">
-        <button class="btn-sm" style="background:#fff;color:#0b0f14;font-weight:700" onclick="markLap()">🏁 Próxima</button>
-        <button class="btn-sm" style="background:rgba(255,255,255,.2)" onclick="stopRest()">Parar</button>
+      <div style="text-align:right">
+        <div class="sb-lbl">TOTAL <span id="sbElapsedR" style="color:#fff;font-weight:700">0:00</span></div>
+        <div class="row" style="margin-top:5px;justify-content:flex-end">
+          <button class="btn-sm" style="background:#fff;color:#0b0f14;font-weight:700" onclick="markLap()">🏁 Próxima</button>
+          <button class="btn-sm" style="background:rgba(255,255,255,.2)" onclick="stopRest()">Parar</button>
+        </div>
       </div>
     </div>
   </div>
@@ -191,7 +198,8 @@ function fmtDur(ms){const t=Math.max(0,Math.floor(ms/1000));const h=Math.floor(t
   return (h?h+":"+String(m).padStart(2,"0"):m)+":"+String(sec).padStart(2,"0");}
 let elapsedId=null;
 function startElapsed(){clearInterval(elapsedId);
-  const tick=()=>{const e=$("#sbElapsed");if(!e||!active){clearInterval(elapsedId);return;}e.textContent=fmtDur(Date.now()-active.started);};
+  const tick=()=>{if(!active){clearInterval(elapsedId);return;}const s=fmtDur(Date.now()-active.started);
+    const e=$("#sbElapsed");if(e)e.textContent=s;const e2=$("#sbElapsedR");if(e2)e2.textContent=s;};
   tick();elapsedId=setInterval(tick,1000);}
 function refreshSbIdle(){if(!active)return;const p=$("#sbProg"),v=$("#sbVol");
   const done=active.exercises.filter(e=>e.sets.length).length;
@@ -211,10 +219,13 @@ function startRest(exIdx){const e=active.exercises[exIdx]||{};swExIdx=exIdx;swSt
   swTarget=inter?INTER_REST:(e.rest||0);
   const lb=$("#sbRestLbl");if(lb)lb.textContent=inter?"ENTRE EXERCÍCIOS":"DESCANSO";
   const tg=$("#sbRestTgt");if(tg)tg.textContent=swTarget?"(meta "+(inter?"2min":swTarget+"s")+")":"";
-  const sb=$("#sessionbar");if(sb){sb.classList.add("on","resting");}swTick();clearInterval(swId);swId=setInterval(swTick,250);}
+  const sb=$("#sessionbar");if(sb){sb.classList.add("on","resting");sb.classList.remove("over");}swTick();clearInterval(swId);swId=setInterval(swTick,250);}
 function swTick(){const sec=Math.floor((Date.now()-swStart)/1000);
-  const e2=$("#sbRestT");if(e2)e2.textContent=Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0");
-  if(swTarget&&sec>=swTarget&&!swBeeped){swBeeped=true;beep();}}
+  const over=swTarget&&sec>=swTarget;
+  const e2=$("#sbRestT");if(e2){const mm=Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0");
+    e2.textContent=over?"+"+mm:mm;}
+  const sb=$("#sessionbar");if(sb)sb.classList.toggle("over",!!over);
+  if(over&&!swBeeped){swBeeped=true;beep();}}
 function markLap(){const sec=Math.round((Date.now()-swStart)/1000);
   const e=active.exercises[swExIdx];
   if(e){if(e.sets.length){const ls=e.sets[e.sets.length-1];ls.rest=sec;ls.t=Date.now();}
@@ -223,7 +234,7 @@ function markLap(){const sec=Math.round((Date.now()-swStart)/1000);
     persistActive();}
   stopRest();render();
   toast(sec+"s registrado");}
-function stopRest(){clearInterval(swId);const sb=$("#sessionbar");if(sb)sb.classList.remove("resting");}
+function stopRest(){clearInterval(swId);const sb=$("#sessionbar");if(sb)sb.classList.remove("resting","over");}
 function beep(){try{const c=new(window.AudioContext||window.webkitAudioContext)();const o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;g.gain.value=.1;o.start();setTimeout(()=>{o.stop();c.close();},400);}catch(e){}
   if(navigator.vibrate)navigator.vibrate([200,80,200]);}
 
@@ -307,7 +318,8 @@ function renderLog(a){
 
   // feitos vão pro fim da lista (ordem estável)
   const order=active.exercises.map((e,i)=>i).sort((x,y)=>(active.exercises[x].done?1:0)-(active.exercises[y].done?1:0));
-  order.forEach(i=>a.appendChild(exCard(active.exercises[i],i)));
+  const activeIdx=active.exercises.findIndex(e=>!e.done);
+  order.forEach(i=>a.appendChild(exCard(active.exercises[i],i,i===activeIdx)));
 
   const addBtn=el("button","btn-ghost","+ Adicionar exercício");addBtn.style.width="100%";addBtn.style.marginBottom="12px";
   addBtn.onclick=()=>{const n=prompt("Nome do exercício:");if(!n)return;active.exercises.push({n,sr:"3×10",rest:60,mvw:false,notes:"",sets:[]});persistActive();render();};
@@ -341,7 +353,7 @@ function trendChip(H){if(H.length<2)return"";const d=Math.round((H[0].top-H[1].t
   if(d<0)return"<span class='trend dn'>↓ "+d+"kg</span>";
   return"<span class='trend eq'>= manteve</span>";}
 
-function exCard(e,ei){
+function exCard(e,ei,isActive){
   // estado concluído e recolhido
   if(e.done&&!e.open){
     const d=el("div","exdone");
@@ -350,7 +362,7 @@ function exCard(e,ei){
     d.onclick=()=>{e.open=true;persistActive();render();};
     return d;
   }
-  const c=el("div","ex");
+  const c=el("div","ex"+(isActive?" active":""));
   const head=el("div","ex-head");
   head.innerHTML="<div><span class='ex-title'>"+esc(e.n)+"</span>"+(e.mvw?"<span class='tag mvw'>🔑 MVW</span>":"")+(e.done?"<span class='tag' style='background:rgba(34,197,94,.15);color:var(--accent)'>✓ feito</span>":"")+
     "<div class='muted'>alvo "+esc(e.sr)+" · desc "+e.rest+"s</div></div>";
