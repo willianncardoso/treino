@@ -614,6 +614,8 @@ function avgWin(m,days){const ks=Object.keys(m||{}).sort();if(!ks.length)return 
 function valAgo(m,days){const ks=Object.keys(m||{}).sort();if(!ks.length)return null;const end=new Date(ks[ks.length-1]);const t=new Date(end-days*864e5);let best=null;for(const k of ks){if(new Date(k)<=t)best=m[k];}return best;}
 function bfPct(m){const o={};for(const k in (m||{}))o[k]=m[k]<1?m[k]*100:m[k];return o;}
 function r1(x){return x==null?"—":Math.round(x*10)/10;}
+const MESN=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+function fmtD(s){const p=String(s||"").split("-");if(p.length<3)return s;return (+p[2])+" "+(MESN[(+p[1])-1]||p[1])+"/"+p[0].slice(2);}
 function arrow(d,good){if(d==null||Math.abs(d)<0.05)return"<span class='trend eq'>=</span>";const up=d>0;const cls=(up===good)?"up":"dn";return "<span class='trend "+cls+"'>"+(up?"↑":"↓")+" "+(d>0?"+":"")+r1(d)+"</span>";}
 
 function renderAnalise(a){
@@ -636,7 +638,7 @@ function renderAnalise(a){
   const kp=el("div");kp.style.cssText="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px";
   const kpi=(l,v,s)=>"<div class='card' style='margin:0;padding:13px'><div class='muted' style='font-size:10px;text-transform:uppercase;letter-spacing:.5px'>"+l+"</div><div style='font-size:21px;font-weight:750;margin-top:2px'>"+v+"</div>"+(s?"<div class='muted' style='font-size:12px;margin-top:1px'>"+s+"</div>":"")+"</div>";
   const last56=sess.filter(s=>(new Date(sess[sess.length-1].date)-new Date(s.date))/864e5<=56).length;
-  let html=kpi("Sessões",sess.length,"última "+sess[sess.length-1].date)
+  let html=kpi("Sessões",sess.length,"última "+fmtD(sess[sess.length-1].date))
     +kpi("Freq. (8 sem)",(last56/8).toFixed(1)+"/sem","")
     +kpi("Volume total",Math.round(sess.reduce((a,s)=>a+s.vol,0)/1000)+"k","kg·rep");
   if(H){const bm=H.daily.BodyMass_kg||{},bf=bfPct(H.daily.BodyFatPercentage),lm=H.daily.LeanBodyMass_kg||{};
@@ -652,11 +654,19 @@ function renderAnalise(a){
 
   // Plano & Ciclo (linha do tempo)
   const pcard=el("div","card");pcard.style.margin="0 0 14px";
-  const pstart=cfg.planStart,wks=cfg.cycleWeeks||4;
+  const hist=cfg.planHistory||[];const wks=cfg.cycleWeeks||4;
+  const pstart=cfg.planStart||(hist.length?hist[hist.length-1].start:null);
   let ptxt="<h3 style='margin:0 0 4px'>Plano & Ciclo</h3><div>Ciclo <b>"+esc(cfg.ciclo)+"</b> · Plano <b>"+esc(cfg.plano)+"</b></div>";
+  if(cfg.planMeta&&cfg.planMeta.start){const s0=new Date(cfg.planMeta.start),w0=cfg.planMeta.weeks||52;const e0=new Date(s0.getTime()+w0*7*864e5);const now=new Date();const wkTot=Math.floor((now-s0)/864e5/7)+1;
+    ptxt+="<div class='muted' style='margin-top:2px'>Plano geral: início "+fmtD(cfg.planMeta.start)+" · "+w0+" sem · semana <b>"+wkTot+"</b> · término previsto <b>"+fmtD(e0.toISOString().slice(0,10))+"</b></div>";}
   if(pstart){const sd=new Date(pstart),now=new Date();const wkNow=Math.floor((now-sd)/864e5/7)+1;const end=new Date(sd.getTime()+wks*7*864e5);const dend=Math.round((end-now)/864e5);
-    ptxt+="<div class='muted' style='margin-top:2px'>Semana <b>"+wkNow+"</b> de "+wks+" · começou "+pstart+" · término previsto <b>"+end.toISOString().slice(0,10)+"</b> "+(dend>=0?"(faltam "+dend+"d)":"<b style='color:var(--warn)'>(estendido "+(-dend)+"d)</b>")+"</div>";}
-  else ptxt+="<div class='muted' style='margin-top:2px'>Defina o início do ciclo para ver semana atual, término previsto e se estendeu.</div>";
+    ptxt+="<div class='muted' style='margin-top:2px'>Ciclo atual: semana <b>"+wkNow+"</b> de "+wks+" · começou "+fmtD(pstart)+" · término previsto <b>"+fmtD(end.toISOString().slice(0,10))+"</b> "+(dend>=0?"(faltam "+dend+"d)":"<b style='color:var(--warn)'>(estendido "+(-dend)+"d)</b>")+"</div>";}
+  else ptxt+="<div class='muted' style='margin-top:2px'>Defina o início do ciclo para ver semana atual e término.</div>";
+  // histórico de ciclos/trocas
+  if(hist.length){ptxt+="<div style='margin-top:8px'><table style='width:100%;border-collapse:collapse;font-size:13px'><tr class='muted'><td>Ciclo</td><td>Início</td><td>Duração</td><td>Plano / nota</td></tr>";
+    hist.forEach((h,i)=>{const nx=hist[i+1]?new Date(hist[i+1].start):new Date();const dur=Math.round((nx-new Date(h.start))/864e5/7);
+      ptxt+="<tr style='border-top:1px solid var(--border)'><td style='padding:5px 0'><b>"+esc(h.cycle||"")+"</b></td><td>"+fmtD(h.start)+"</td><td>"+dur+" sem"+(hist[i+1]?"":" · atual")+"</td><td class='muted'>"+esc((h.plan||"")+(h.note?" · "+h.note:""))+"</td></tr>";});
+    ptxt+="</table></div>";}
   pcard.innerHTML=ptxt;
   const prow=el("div","row");prow.style.marginTop="8px";
   const di=el("input");di.type="date";di.value=pstart||"";di.style.width="170px";di.onchange=()=>{cfg.planStart=di.value;save(K.cfg,cfg);render();};
@@ -694,7 +704,7 @@ function renderAnalise(a){
   const prc=el("div","card");prc.style.marginTop="14px";
   const prm={};sess.forEach(s=>s.exercises.forEach(e=>{if(e.top>((prm[e.name]||{}).top||0))prm[e.name]={top:e.top,date:s.date};}));
   let prh="<h3>Recordes (PR) por exercício</h3><table style='width:100%;border-collapse:collapse;font-size:14px'>";
-  Object.keys(prm).sort((x,y)=>prm[y].top-prm[x].top).forEach(n=>{prh+="<tr style='border-top:1px solid var(--border)'><td style='padding:7px 0'>"+esc(n)+"</td><td style='text-align:right;font-weight:700'>"+prm[n].top+" kg</td><td style='text-align:right;color:var(--muted);padding-left:10px'>"+prm[n].date+"</td></tr>";});
+  Object.keys(prm).sort((x,y)=>prm[y].top-prm[x].top).forEach(n=>{prh+="<tr style='border-top:1px solid var(--border)'><td style='padding:7px 0'>"+esc(n)+"</td><td style='text-align:right;font-weight:700'>"+prm[n].top+" kg</td><td style='text-align:right;color:var(--muted);padding-left:10px'>"+fmtD(prm[n].date)+"</td></tr>";});
   prh+="</table>";prc.innerHTML=prh;a.appendChild(prc);
   a.appendChild(el("div",null,"<div style='height:40px'></div>"));
 
@@ -707,6 +717,10 @@ function buildCharts(sess,H){
   Chart.defaults.color=(cs.getPropertyValue("--muted").trim())||"#8b97a6";
   Chart.defaults.borderColor=(cs.getPropertyValue("--border").trim())||"#26313d";
   Chart.defaults.font.family="-apple-system,sans-serif";
+  // rótulos de mês por abreviação (jan/26, fev/26…)
+  const MES=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+  const mlabel=s=>{const p=String(s).split("-");return p.length<2?s:((MES[(+p[1])-1]||p[1])+"/"+p[0].slice(2));};
+  if(Chart.defaults.scales&&Chart.defaults.scales.category){Chart.defaults.scales.category.ticks=Object.assign({},Chart.defaults.scales.category.ticks,{callback:function(v){return mlabel(this.getLabelForValue(v));}});}
   const GREEN="#22c55e",BLUE="#3b82f6",WARN="#f59e0b",RED="#ef4444";
   const G=goals();
   const noBandLegend={legend:{labels:{filter:it=>!(it.text||"").startsWith("_")}},tooltip:{filter:it=>!((it.dataset.label||"").startsWith("_"))}};
