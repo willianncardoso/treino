@@ -104,6 +104,13 @@ textarea{width:100%;background:var(--surface2);border:1px solid var(--border);bo
 .seg button.active{background:var(--accent);color:#fff}
 hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 a{color:var(--accent2)}
+/* tema claro */
+body.light{--bg:#f4f6f9;--surface:#ffffff;--surface2:#eef2f7;--border:#d5dde6;--text:#17202a;--muted:#5c6b7a}
+body.light .tabbar{background:rgba(255,255,255,.92)}
+/* modo largo (aba análise no desktop) */
+body.wide .wrap{max-width:1180px}
+.dashgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px}
+.dashgrid .full{grid-column:1 / -1}
 </style>
 </head>
 <body>
@@ -179,6 +186,9 @@ let templates = load(K.tpl, null) || DEFAULT_TEMPLATES;
 let sessions  = load(K.sess, []);
 let active    = load(K.active, null);
 let cfg       = load(K.cfg, {ciclo:"C4", plano:"ABCD", musicUrl:""});
+const GOALS_DEFAULT={weight:[81,83], fat:[15,17], lean:66}; // metas de recomposição
+function goals(){return cfg.goals||GOALS_DEFAULT;}
+function applyTheme(){document.body.classList.toggle("light",cfg.theme==="light");}
 let tab = active ? "log" : "home";
 
 /* ============ HELPERS ============ */
@@ -253,6 +263,7 @@ function renderTabs(){
 /* ============ RENDER ROUTER ============ */
 function render(){renderTabs();const a=$("#app");a.innerHTML="";
   if(tab==="analise"&&!isDesktop())tab="hist";
+  document.body.classList.toggle("wide",tab==="analise");
   if(tab==="log"&&active) renderLog(a);
   else if(tab==="home") renderHome(a);
   else if(tab==="hist") renderHist(a);
@@ -615,7 +626,9 @@ function renderAnalise(a){
   fi.onchange=()=>{const f=fi.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);
     if(d.daily){save(K_HEALTH,d);toast("Apple Health carregado ✓");render();}else toast("Carregue o apple_health.json");}catch(e){toast("JSON inválido");}};rd.readAsText(f);};
   const lb=el("button","btn-ghost btn-sm",H?"🔄 Trocar Apple Health":"⬆ Carregar Apple Health");lb.onclick=()=>fi.click();
-  head.appendChild(lb);head.appendChild(fi);a.appendChild(head);
+  const th=el("button","btn-ghost btn-sm",cfg.theme==="light"?"🌙 Escuro":"☀️ Claro");
+  th.onclick=()=>{cfg.theme=(cfg.theme==="light")?"dark":"light";save(K.cfg,cfg);applyTheme();render();};
+  head.appendChild(th);head.appendChild(lb);head.appendChild(fi);a.appendChild(head);
 
   if(!sess.length){a.appendChild(el("div","empty","<div class='ic'>📊</div><div>Sem treinos carregados neste navegador.<br>Vá em <b>Ajustes → ⬆ Importar</b> e carregue seu <b>treino-restore.json</b>.</div>"));return;}
 
@@ -627,24 +640,39 @@ function renderAnalise(a){
     +kpi("Freq. (8 sem)",(last56/8).toFixed(1)+"/sem","")
     +kpi("Volume total",Math.round(sess.reduce((a,s)=>a+s.vol,0)/1000)+"k","kg·rep");
   if(H){const bm=H.daily.BodyMass_kg||{},bf=bfPct(H.daily.BodyFatPercentage),lm=H.daily.LeanBodyMass_kg||{};
-    const lw=latestVal(bm),lf=latestVal(bf),ll=latestVal(lm);
-    html+=kpi("Peso",r1(lw&&lw.v)+" kg",arrow(lw&&lw.v-valAgo(bm,90),false)+" vs 90d")
-      +kpi("Gordura",r1(lf&&lf.v)+"%",arrow(lf&&lf.v-valAgo(bf,90),false)+" vs 90d")
-      +kpi("Massa magra",r1(ll&&ll.v)+" kg",arrow(ll&&ll.v-valAgo(lm,90),true)+" vs 90d")
+    const lw=latestVal(bm),lf=latestVal(bf),ll=latestVal(lm);const g=goals();
+    const gTxt=(v,range,unit)=>{if(v==null)return"";const[lo,hi]=range;if(v>=lo&&v<=hi)return "<b style='color:var(--accent)'>🎯 na meta</b>";const falta=r1(v>hi?v-hi:lo-v);return "meta "+lo+"–"+hi+unit+" · falta "+falta+unit;};
+    html+=kpi("Peso",r1(lw&&lw.v)+" kg",arrow(lw&&lw.v-valAgo(bm,90),false)+" · "+gTxt(lw&&lw.v,g.weight,"kg"))
+      +kpi("Gordura",r1(lf&&lf.v)+"%",arrow(lf&&lf.v-valAgo(bf,90),false)+" · "+gTxt(lf&&lf.v,g.fat,"%"))
+      +kpi("Massa magra",r1(ll&&ll.v)+" kg",arrow(ll&&ll.v-valAgo(lm,90),true)+" · "+((ll&&ll.v>=g.lean)?"<b style='color:var(--accent)'>🎯 ≥"+g.lean+"</b>":"meta ≥"+g.lean+"kg"))
       +kpi("VO2 Max",r1(latestVal(H.daily.VO2Max||{})&&latestVal(H.daily.VO2Max).v),"")
       +kpi("FC rep (30d)",r1(avgWin(H.daily.RestingHeartRate_bpm,30))+" bpm","")
       +kpi("HRV (30d)",r1(avgWin(H.daily.HRV_SDNN_ms,30))+" ms","");}
   kp.innerHTML=html;a.appendChild(kp);
 
+  // Plano & Ciclo (linha do tempo)
+  const pcard=el("div","card");pcard.style.margin="0 0 14px";
+  const pstart=cfg.planStart,wks=cfg.cycleWeeks||4;
+  let ptxt="<h3 style='margin:0 0 4px'>Plano & Ciclo</h3><div>Ciclo <b>"+esc(cfg.ciclo)+"</b> · Plano <b>"+esc(cfg.plano)+"</b></div>";
+  if(pstart){const sd=new Date(pstart),now=new Date();const wkNow=Math.floor((now-sd)/864e5/7)+1;const end=new Date(sd.getTime()+wks*7*864e5);const dend=Math.round((end-now)/864e5);
+    ptxt+="<div class='muted' style='margin-top:2px'>Semana <b>"+wkNow+"</b> de "+wks+" · começou "+pstart+" · término previsto <b>"+end.toISOString().slice(0,10)+"</b> "+(dend>=0?"(faltam "+dend+"d)":"<b style='color:var(--warn)'>(estendido "+(-dend)+"d)</b>")+"</div>";}
+  else ptxt+="<div class='muted' style='margin-top:2px'>Defina o início do ciclo para ver semana atual, término previsto e se estendeu.</div>";
+  pcard.innerHTML=ptxt;
+  const prow=el("div","row");prow.style.marginTop="8px";
+  const di=el("input");di.type="date";di.value=pstart||"";di.style.width="170px";di.onchange=()=>{cfg.planStart=di.value;save(K.cfg,cfg);render();};
+  const wi=el("input");wi.type="number";wi.value=wks;wi.style.width="70px";wi.onchange=()=>{cfg.cycleWeeks=parseInt(wi.value)||4;save(K.cfg,cfg);render();};
+  prow.appendChild(el("span","muted","Início do ciclo:"));prow.appendChild(di);prow.appendChild(el("span","muted","Semanas:"));prow.appendChild(wi);
+  pcard.appendChild(prow);a.appendChild(pcard);
+
   if(!H)a.appendChild(el("div","muted","<div class='card' style='margin:0 0 14px'>Carregue o <b>apple_health.json</b> (do vault <code>_dados/</code>) pra ver composição corporal, recuperação e o cruzamento treino×gordura. Botão acima ↑</div>"));
 
   // layout de gráficos
-  const grid=el("div");grid.style.cssText="display:grid;grid-template-columns:1fr 1fr;gap:14px";
+  const grid=el("div","dashgrid");
   const chartCard=(title,id,sub)=>{const c=el("div","card");c.style.margin="0";
     c.innerHTML="<h3 style='margin:0 0 2px'>"+title+"</h3>"+(sub?"<div class='muted' style='font-size:12px;margin-bottom:8px'>"+sub+"</div>":"<div style='height:8px'></div>");
-    const wrap=el("div");wrap.style.cssText="position:relative;height:260px";const cv=el("canvas");cv.id=id;wrap.appendChild(cv);c.appendChild(wrap);return c;};
+    const wrap=el("div");wrap.style.cssText="position:relative;height:280px";const cv=el("canvas");cv.id=id;wrap.appendChild(cv);c.appendChild(wrap);return c;};
 
-  if(H){const cc=chartCard("Composição corporal","cComp","Peso e massa magra (kg) · gordura (%)");cc.style.gridColumn="1 / -1";grid.appendChild(cc);
+  if(H){const cc=chartCard("Composição corporal","cComp","Peso e massa magra (kg) · gordura (%) · faixas de meta tracejadas");cc.classList.add("full");grid.appendChild(cc);
     grid.appendChild(chartCard("Treino × Gordura","cTrFat","Volume mensal (barras) vs % gordura (linha) — a correlação-chave"));}
   grid.appendChild(chartCard("Volume & frequência mensal","cVolFreq","Volume (barras) e nº de sessões (linha)"));
   // progressão por exercício
@@ -656,7 +684,8 @@ function renderAnalise(a){
   pc.innerHTML="<h3 style='margin:0 0 6px'>Progressão por exercício</h3>";pc.appendChild(sel);
   const pw=el("div");pw.style.cssText="position:relative;height:240px";const pcv=el("canvas");pcv.id="cProg";pw.appendChild(pcv);pc.appendChild(pw);
   grid.appendChild(pc);
-  if(H){grid.appendChild(chartCard("Recuperação (FC repouso × HRV)","cRec","bpm e ms"));
+  if(H){grid.appendChild(chartCard("Cardio (min/mês)","cCardio","Caminhada · bike · corrida (do Apple Watch)"));
+    grid.appendChild(chartCard("Recuperação (FC repouso × HRV)","cRec","bpm e ms"));
     grid.appendChild(chartCard("VO2 Max","cVO2",""));
     grid.appendChild(chartCard("Sono (méd h/noite por mês)","cSleep","* soma de intervalos — direção confiável, valor absoluto pode inflar"));}
   a.appendChild(grid);
@@ -674,8 +703,17 @@ function renderAnalise(a){
 }
 function buildCharts(sess,H){
   if(!window.Chart)return;
-  Chart.defaults.color="#8b97a6";Chart.defaults.borderColor="#26313d";Chart.defaults.font.family="-apple-system,sans-serif";
+  const cs=getComputedStyle(document.body);
+  Chart.defaults.color=(cs.getPropertyValue("--muted").trim())||"#8b97a6";
+  Chart.defaults.borderColor=(cs.getPropertyValue("--border").trim())||"#26313d";
+  Chart.defaults.font.family="-apple-system,sans-serif";
   const GREEN="#22c55e",BLUE="#3b82f6",WARN="#f59e0b",RED="#ef4444";
+  const G=goals();
+  const noBandLegend={legend:{labels:{filter:it=>!(it.text||"").startsWith("_")}},tooltip:{filter:it=>!((it.dataset.label||"").startsWith("_"))}};
+  const band=(ks,lo,hi,color,axis)=>[
+    {label:"_hi",data:ks.map(()=>hi),yAxisID:axis,borderColor:color,borderDash:[5,4],borderWidth:1,pointRadius:0,fill:false},
+    {label:"_lo",data:ks.map(()=>lo),yAxisID:axis,borderColor:color,borderDash:[5,4],borderWidth:1,pointRadius:0,fill:"-1",backgroundColor:color.replace(")",",.10)").replace("rgb","rgba")}
+  ];
   const mk=(id,cfg)=>{const cv=document.getElementById(id);if(!cv)return;charts.push(new Chart(cv.getContext("2d"),cfg));};
   const line=(d,color,axis,fill)=>({label:d.label,data:d.data,borderColor:color,backgroundColor:fill||color,yAxisID:axis||"y",tension:.25,pointRadius:d.data.length>40?0:2,borderWidth:2,spanGaps:true});
   // treino mensal
@@ -686,11 +724,13 @@ function buildCharts(sess,H){
     const bm=H.daily.BodyMass_kg||{},bf=bfPct(H.daily.BodyFatPercentage),lm=H.daily.LeanBodyMass_kg||{};
     const ks=[...new Set([...Object.keys(bm),...Object.keys(lm)])].sort().filter(k=>k>="2025-01-01");
     mk("cComp",{type:"line",data:{labels:ks,datasets:[
+      ...band(ks,G.weight[0],G.weight[1],"rgb(34,197,94)","y"),
+      ...band(ks,G.fat[0],G.fat[1],"rgb(245,158,11)","y1"),
       line({label:"Peso (kg)",data:ks.map(k=>bm[k]??null)},GREEN,"y"),
       line({label:"Massa magra (kg)",data:ks.map(k=>lm[k]??null)},BLUE,"y"),
       line({label:"Gordura (%)",data:ks.map(k=>bf[k]??null)},WARN,"y1"),
-    ]},options:{maintainAspectRatio:false,interaction:{mode:"index",intersect:false},scales:{
-      y:{position:"left",title:{display:true,text:"kg"}},y1:{position:"right",grid:{drawOnChartArea:false},title:{display:true,text:"%"}},
+    ]},options:{maintainAspectRatio:false,interaction:{mode:"index",intersect:false},plugins:noBandLegend,scales:{
+      y:{position:"left",title:{display:true,text:"kg (meta "+G.weight[0]+"–"+G.weight[1]+")"}},y1:{position:"right",grid:{drawOnChartArea:false},title:{display:true,text:"% gordura (meta "+G.fat[0]+"–"+G.fat[1]+")"}},
       x:{ticks:{maxTicksLimit:12}}}}});
 
     const bfm=moAvg(bf);const months=[...new Set([...tmonths,...Object.keys(bfm)])].sort().filter(m=>m>="2025-11");
@@ -715,6 +755,17 @@ function buildCharts(sess,H){
 
     const sm=moAvg(H.sleep_hours_by_night||{});const smk=Object.keys(sm).sort().filter(m=>m>="2025-11");
     mk("cSleep",{type:"bar",data:{labels:smk,datasets:[{label:"h/noite",data:smk.map(m=>sm[m]),backgroundColor:"rgba(59,130,246,.55)"}]},options:{maintainAspectRatio:false,scales:{y:{title:{display:true,text:"h"}}}}});
+
+    // cardio (min/mês) por tipo, do Apple Watch
+    const CARDIO=["Walking","Cycling","Running","IndoorCycle","Elliptical","HIIT"];
+    const cmin={},ccnt={};(H.workouts||[]).forEach(w=>{if(!w.date||!CARDIO.some(t=>(w.type||"").includes(t)))return;const y=w.date.slice(0,7);cmin[y]=(cmin[y]||0)+(w.duration_min||0);ccnt[y]=(ccnt[y]||0)+1;});
+    const cmk=Object.keys(cmin).sort().filter(m=>m>="2025-11");
+    const goalMin=8*27; // meta ~2x/sem * ~27min * 4 sem ≈ 216 min/mês
+    mk("cCardio",{data:{labels:cmk,datasets:[
+      {type:"bar",label:"Cardio (min)",data:cmk.map(m=>Math.round(cmin[m])),backgroundColor:"rgba(34,197,94,.5)",yAxisID:"y"},
+      {type:"line",label:"Meta ~"+goalMin+"min",data:cmk.map(()=>goalMin),borderColor:WARN,borderDash:[5,4],borderWidth:1.5,pointRadius:0,yAxisID:"y"},
+      {type:"line",label:"Sessões",data:cmk.map(m=>ccnt[m]),borderColor:BLUE,backgroundColor:BLUE,yAxisID:"y1",tension:.25,borderWidth:2},
+    ]},options:{maintainAspectRatio:false,scales:{y:{position:"left",title:{display:true,text:"min"}},y1:{position:"right",grid:{drawOnChartArea:false},min:0,title:{display:true,text:"nº"}}}}});
   }
 
   mk("cVolFreq",{data:{labels:tmonths,datasets:[
@@ -888,7 +939,7 @@ function exportAllMd(){if(!sessions.length){toast("Sem treinos");return;}
   download("Treinos ("+today()+").md",all,"text/markdown");}
 
 /* ============ BOOT ============ */
-requestPersist();
+requestPersist();applyTheme();
 render();
 </script>
 </body>
