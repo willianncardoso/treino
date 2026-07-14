@@ -590,7 +590,7 @@ const K_HEALTH="gymlog_health_v1";
 let charts=[], analProgEx=null;
 function destroyCharts(){charts.forEach(c=>{try{c.destroy();}catch(e){}});charts=[];}
 function ensureChart(cb){if(window.Chart)return cb();
-  const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js";
+  const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js";
   s.onload=cb;s.onerror=()=>toast("Sem internet p/ carregar gráficos");document.head.appendChild(s);}
 function normSessions(){return sessions.map(s=>{
     const exs=(s.exercises||[]).map(e=>{const sets=(e.sets||[]).map(st=>({w:parseFloat(st.w)||0,r:parseFloat(st.r)||0}));
