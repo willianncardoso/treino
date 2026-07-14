@@ -468,6 +468,7 @@ function finishSession(){
   showMarkdown(withSets);
 }
 function downloadBackup(){cfg.lastBackup=today();save(K.cfg,cfg);
+  toast("Backup: "+sessions.length+" treinos → salve no vault");
   download("treino-backup-"+today()+".json",JSON.stringify({templates,sessions,cfg},null,2),"application/json");}
 function requestPersist(){try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}}
 
@@ -510,8 +511,18 @@ function showMarkdown(s){
   c.appendChild(bar);a.appendChild(c);
   a.appendChild(el("div","muted","Cole no seu vault em <b>54 Saúde &amp; Fitness / 54.01 Academia</b>. Os <code>[[exercícios]]</code> viram wikilinks automaticamente."));
 }
-function download(fn,content,type){const b=new Blob([content],{type});const u=URL.createObjectURL(b);
-  const a=document.createElement("a");a.href=u;a.download=fn;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);}
+async function download(fn,content,type){
+  const blob=new Blob([content],{type});
+  // iOS/celular: share sheet ("Salvar em Arquivos") é o único jeito confiável
+  try{
+    if(navigator.canShare){
+      const file=new File([blob],fn,{type});
+      if(navigator.canShare({files:[file]})){await navigator.share({files:[file],title:fn});return true;}
+    }
+  }catch(e){if(e&&e.name==="AbortError")return false;} // usuário cancelou
+  // fallback desktop
+  const u=URL.createObjectURL(blob);const a=document.createElement("a");a.href=u;a.download=fn;
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500);return true;}
 
 /* ---------- HISTÓRICO / CHARTS ---------- */
 let histEx=null, histMetric="peso";
