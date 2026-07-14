@@ -239,9 +239,12 @@ function beep(){try{const c=new(window.AudioContext||window.webkitAudioContext)(
   if(navigator.vibrate)navigator.vibrate([200,80,200]);}
 
 /* ============ NAV ============ */
+function isDesktop(){return window.matchMedia("(min-width: 900px)").matches;}
 function go(t){tab=t;render();window.scrollTo(0,0);}
 function renderTabs(){
-  const tabs=[["home","🏠","Treinar"],["hist","📈","Histórico"],["cfg","⚙️","Ajustes"]];
+  const tabs=[["home","🏠","Treinar"],["hist","📈","Histórico"]];
+  if(isDesktop())tabs.push(["analise","📊","Análise"]);
+  tabs.push(["cfg","⚙️","Ajustes"]);
   const tb=$("#tabbar");tb.innerHTML="";
   tabs.forEach(([id,ic,lb])=>{const b=el("button",(tab===id||(id==="home"&&tab==="log"))?"active":"","<span class='ic'>"+ic+"</span>"+lb);
     b.onclick=()=>go(id);tb.appendChild(b);});
@@ -249,9 +252,11 @@ function renderTabs(){
 
 /* ============ RENDER ROUTER ============ */
 function render(){renderTabs();const a=$("#app");a.innerHTML="";
+  if(tab==="analise"&&!isDesktop())tab="hist";
   if(tab==="log"&&active) renderLog(a);
   else if(tab==="home") renderHome(a);
   else if(tab==="hist") renderHist(a);
+  else if(tab==="analise") renderAnalise(a);
   else if(tab==="cfg")  renderCfg(a);
   else renderHome(a);
   updateSessionBar();
@@ -448,8 +453,12 @@ function finishSession(){
   sessions.push(withSets);save(K.sess,sessions);
   active=null;localStorage.removeItem(K.active);
   toast("Treino salvo ✓");
+  if(cfg.autoBackup)downloadBackup();
   showMarkdown(withSets);
 }
+function downloadBackup(){cfg.lastBackup=today();save(K.cfg,cfg);
+  download("treino-backup-"+today()+".json",JSON.stringify({templates,sessions,cfg},null,2),"application/json");}
+function requestPersist(){try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}}
 
 /* ---------- MARKDOWN EXPORT ---------- */
 function sessionMarkdown(s){
@@ -576,6 +585,151 @@ function drawChart(cv,pts,unit){
   pts.forEach((p,i)=>{if(i%step===0||i===pts.length-1){ctx.fillText(p.x.slice(5),px(i),H-8);}});
 }
 
+/* ---------- ANÁLISE (desktop) ---------- */
+const K_HEALTH="gymlog_health_v1";
+let charts=[], analProgEx=null;
+function destroyCharts(){charts.forEach(c=>{try{c.destroy();}catch(e){}});charts=[];}
+function ensureChart(cb){if(window.Chart)return cb();
+  const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js";
+  s.onload=cb;s.onerror=()=>toast("Sem internet p/ carregar gráficos");document.head.appendChild(s);}
+function normSessions(){return sessions.map(s=>{
+    const exs=(s.exercises||[]).map(e=>{const sets=(e.sets||[]).map(st=>({w:parseFloat(st.w)||0,r:parseFloat(st.r)||0}));
+      return {name:e.n,sets,top:sets.reduce((a,x)=>Math.max(a,x.w),0),vol:sets.reduce((a,x)=>a+x.w*x.r,0)};});
+    return {day:s.day,date:s.date,exercises:exs,vol:exs.reduce((a,e)=>a+e.vol,0)};
+  }).filter(s=>s.date).sort((a,b)=>a.date<b.date?-1:1);}
+function moAvg(m){const g={};for(const k in m){(g[k.slice(0,7)]=g[k.slice(0,7)]||[]).push(m[k]);}const o={};for(const y in g)o[y]=g[y].reduce((a,b)=>a+b,0)/g[y].length;return o;}
+function latestVal(m){const ks=Object.keys(m||{}).sort();return ks.length?{d:ks[ks.length-1],v:m[ks[ks.length-1]]}:null;}
+function avgWin(m,days){const ks=Object.keys(m||{}).sort();if(!ks.length)return null;const end=new Date(ks[ks.length-1]);const v=ks.filter(k=>(end-new Date(k))/864e5<=days).map(k=>m[k]);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;}
+function valAgo(m,days){const ks=Object.keys(m||{}).sort();if(!ks.length)return null;const end=new Date(ks[ks.length-1]);const t=new Date(end-days*864e5);let best=null;for(const k of ks){if(new Date(k)<=t)best=m[k];}return best;}
+function bfPct(m){const o={};for(const k in (m||{}))o[k]=m[k]<1?m[k]*100:m[k];return o;}
+function r1(x){return x==null?"—":Math.round(x*10)/10;}
+function arrow(d,good){if(d==null||Math.abs(d)<0.05)return"<span class='trend eq'>=</span>";const up=d>0;const cls=(up===good)?"up":"dn";return "<span class='trend "+cls+"'>"+(up?"↑":"↓")+" "+(d>0?"+":"")+r1(d)+"</span>";}
+
+function renderAnalise(a){
+  destroyCharts();
+  const sess=normSessions();
+  const raw=load(K_HEALTH,null);
+  const H=raw&&raw.daily?raw:null;
+  const head=el("div","row");head.innerHTML="<div style='flex:1'><h1>Análise</h1><div class='muted'>"+sess.length+" sessões · Apple Health "+(H?"carregado ✓":"não carregado")+" · dados só neste navegador</div></div>";
+  const fi=el("input");fi.type="file";fi.accept=".json";fi.style.display="none";
+  fi.onchange=()=>{const f=fi.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);
+    if(d.daily){save(K_HEALTH,d);toast("Apple Health carregado ✓");render();}else toast("Carregue o apple_health.json");}catch(e){toast("JSON inválido");}};rd.readAsText(f);};
+  const lb=el("button","btn-ghost btn-sm",H?"🔄 Trocar Apple Health":"⬆ Carregar Apple Health");lb.onclick=()=>fi.click();
+  head.appendChild(lb);head.appendChild(fi);a.appendChild(head);
+
+  if(!sess.length){a.appendChild(el("div","empty","<div class='ic'>📊</div><div>Sem treinos carregados neste navegador.<br>Vá em <b>Ajustes → ⬆ Importar</b> e carregue seu <b>treino-restore.json</b>.</div>"));return;}
+
+  // KPIs
+  const kp=el("div");kp.style.cssText="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px";
+  const kpi=(l,v,s)=>"<div class='card' style='margin:0;padding:13px'><div class='muted' style='font-size:10px;text-transform:uppercase;letter-spacing:.5px'>"+l+"</div><div style='font-size:21px;font-weight:750;margin-top:2px'>"+v+"</div>"+(s?"<div class='muted' style='font-size:12px;margin-top:1px'>"+s+"</div>":"")+"</div>";
+  const last56=sess.filter(s=>(new Date(sess[sess.length-1].date)-new Date(s.date))/864e5<=56).length;
+  let html=kpi("Sessões",sess.length,"última "+sess[sess.length-1].date)
+    +kpi("Freq. (8 sem)",(last56/8).toFixed(1)+"/sem","")
+    +kpi("Volume total",Math.round(sess.reduce((a,s)=>a+s.vol,0)/1000)+"k","kg·rep");
+  if(H){const bm=H.daily.BodyMass_kg||{},bf=bfPct(H.daily.BodyFatPercentage),lm=H.daily.LeanBodyMass_kg||{};
+    const lw=latestVal(bm),lf=latestVal(bf),ll=latestVal(lm);
+    html+=kpi("Peso",r1(lw&&lw.v)+" kg",arrow(lw&&lw.v-valAgo(bm,90),false)+" vs 90d")
+      +kpi("Gordura",r1(lf&&lf.v)+"%",arrow(lf&&lf.v-valAgo(bf,90),false)+" vs 90d")
+      +kpi("Massa magra",r1(ll&&ll.v)+" kg",arrow(ll&&ll.v-valAgo(lm,90),true)+" vs 90d")
+      +kpi("VO2 Max",r1(latestVal(H.daily.VO2Max||{})&&latestVal(H.daily.VO2Max).v),"")
+      +kpi("FC rep (30d)",r1(avgWin(H.daily.RestingHeartRate_bpm,30))+" bpm","")
+      +kpi("HRV (30d)",r1(avgWin(H.daily.HRV_SDNN_ms,30))+" ms","");}
+  kp.innerHTML=html;a.appendChild(kp);
+
+  if(!H)a.appendChild(el("div","muted","<div class='card' style='margin:0 0 14px'>Carregue o <b>apple_health.json</b> (do vault <code>_dados/</code>) pra ver composição corporal, recuperação e o cruzamento treino×gordura. Botão acima ↑</div>"));
+
+  // layout de gráficos
+  const grid=el("div");grid.style.cssText="display:grid;grid-template-columns:1fr 1fr;gap:14px";
+  const chartCard=(title,id,sub)=>{const c=el("div","card");c.style.margin="0";
+    c.innerHTML="<h3 style='margin:0 0 2px'>"+title+"</h3>"+(sub?"<div class='muted' style='font-size:12px;margin-bottom:8px'>"+sub+"</div>":"<div style='height:8px'></div>");
+    const wrap=el("div");wrap.style.cssText="position:relative;height:260px";const cv=el("canvas");cv.id=id;wrap.appendChild(cv);c.appendChild(wrap);return c;};
+
+  if(H){const cc=chartCard("Composição corporal","cComp","Peso e massa magra (kg) · gordura (%)");cc.style.gridColumn="1 / -1";grid.appendChild(cc);
+    grid.appendChild(chartCard("Treino × Gordura","cTrFat","Volume mensal (barras) vs % gordura (linha) — a correlação-chave"));}
+  grid.appendChild(chartCard("Volume & frequência mensal","cVolFreq","Volume (barras) e nº de sessões (linha)"));
+  // progressão por exercício
+  const pc=el("div","card");pc.style.margin="0";
+  const names=[...new Set(sess.flatMap(s=>s.exercises.map(e=>e.name)))].sort();
+  if(!analProgEx||!names.includes(analProgEx))analProgEx=names[0];
+  const sel=el("select");sel.style.marginBottom="8px";names.forEach(n=>{const o=el("option",null,esc(n));o.value=n;if(n===analProgEx)o.selected=true;sel.appendChild(o);});
+  sel.onchange=()=>{analProgEx=sel.value;render();};
+  pc.innerHTML="<h3 style='margin:0 0 6px'>Progressão por exercício</h3>";pc.appendChild(sel);
+  const pw=el("div");pw.style.cssText="position:relative;height:240px";const pcv=el("canvas");pcv.id="cProg";pw.appendChild(pcv);pc.appendChild(pw);
+  grid.appendChild(pc);
+  if(H){grid.appendChild(chartCard("Recuperação (FC repouso × HRV)","cRec","bpm e ms"));
+    grid.appendChild(chartCard("VO2 Max","cVO2",""));
+    grid.appendChild(chartCard("Sono (méd h/noite por mês)","cSleep","* soma de intervalos — direção confiável, valor absoluto pode inflar"));}
+  a.appendChild(grid);
+
+  // PRs
+  const prc=el("div","card");prc.style.marginTop="14px";
+  const prm={};sess.forEach(s=>s.exercises.forEach(e=>{if(e.top>((prm[e.name]||{}).top||0))prm[e.name]={top:e.top,date:s.date};}));
+  let prh="<h3>Recordes (PR) por exercício</h3><table style='width:100%;border-collapse:collapse;font-size:14px'>";
+  Object.keys(prm).sort((x,y)=>prm[y].top-prm[x].top).forEach(n=>{prh+="<tr style='border-top:1px solid var(--border)'><td style='padding:7px 0'>"+esc(n)+"</td><td style='text-align:right;font-weight:700'>"+prm[n].top+" kg</td><td style='text-align:right;color:var(--muted);padding-left:10px'>"+prm[n].date+"</td></tr>";});
+  prh+="</table>";prc.innerHTML=prh;a.appendChild(prc);
+  a.appendChild(el("div",null,"<div style='height:40px'></div>"));
+
+  // renderiza gráficos
+  ensureChart(()=>buildCharts(sess,H));
+}
+function buildCharts(sess,H){
+  if(!window.Chart)return;
+  Chart.defaults.color="#8b97a6";Chart.defaults.borderColor="#26313d";Chart.defaults.font.family="-apple-system,sans-serif";
+  const GREEN="#22c55e",BLUE="#3b82f6",WARN="#f59e0b",RED="#ef4444";
+  const mk=(id,cfg)=>{const cv=document.getElementById(id);if(!cv)return;charts.push(new Chart(cv.getContext("2d"),cfg));};
+  const line=(d,color,axis,fill)=>({label:d.label,data:d.data,borderColor:color,backgroundColor:fill||color,yAxisID:axis||"y",tension:.25,pointRadius:d.data.length>40?0:2,borderWidth:2,spanGaps:true});
+  // treino mensal
+  const vol={},cnt={};sess.forEach(s=>{const y=s.date.slice(0,7);vol[y]=(vol[y]||0)+s.vol;cnt[y]=(cnt[y]||0)+1;});
+  const tmonths=Object.keys(vol).sort();
+
+  if(H){
+    const bm=H.daily.BodyMass_kg||{},bf=bfPct(H.daily.BodyFatPercentage),lm=H.daily.LeanBodyMass_kg||{};
+    const ks=[...new Set([...Object.keys(bm),...Object.keys(lm)])].sort().filter(k=>k>="2025-01-01");
+    mk("cComp",{type:"line",data:{labels:ks,datasets:[
+      line({label:"Peso (kg)",data:ks.map(k=>bm[k]??null)},GREEN,"y"),
+      line({label:"Massa magra (kg)",data:ks.map(k=>lm[k]??null)},BLUE,"y"),
+      line({label:"Gordura (%)",data:ks.map(k=>bf[k]??null)},WARN,"y1"),
+    ]},options:{maintainAspectRatio:false,interaction:{mode:"index",intersect:false},scales:{
+      y:{position:"left",title:{display:true,text:"kg"}},y1:{position:"right",grid:{drawOnChartArea:false},title:{display:true,text:"%"}},
+      x:{ticks:{maxTicksLimit:12}}}}});
+
+    const bfm=moAvg(bf);const months=[...new Set([...tmonths,...Object.keys(bfm)])].sort().filter(m=>m>="2025-11");
+    mk("cTrFat",{data:{labels:months,datasets:[
+      {type:"bar",label:"Volume (kg·rep)",data:months.map(m=>vol[m]||0),backgroundColor:"rgba(34,197,94,.5)",yAxisID:"y"},
+      {type:"line",label:"Gordura (%)",data:months.map(m=>bfm[m]??null),borderColor:WARN,backgroundColor:WARN,yAxisID:"y1",tension:.25,borderWidth:2,spanGaps:true},
+    ]},options:{maintainAspectRatio:false,scales:{y:{position:"left"},y1:{position:"right",grid:{drawOnChartArea:false},title:{display:true,text:"%"}}}}});
+
+    mk("cRec",{type:"line",data:{labels:Object.keys(H.daily.RestingHeartRate_bpm||{}).sort().filter(k=>k>="2025-11-01"),datasets:[
+      line({label:"FC repouso (bpm)",data:Object.keys(H.daily.RestingHeartRate_bpm||{}).sort().filter(k=>k>="2025-11-01").map(k=>H.daily.RestingHeartRate_bpm[k])},RED,"y"),
+    ]},options:{maintainAspectRatio:false,scales:{x:{ticks:{maxTicksLimit:10}}}}});
+    // HRV as second chart dataset overlaid: rebuild cRec with both aligned by union
+    const rk=[...new Set([...Object.keys(H.daily.RestingHeartRate_bpm||{}),...Object.keys(H.daily.HRV_SDNN_ms||{})])].sort().filter(k=>k>="2025-11-01");
+    charts.pop().destroy();
+    mk("cRec",{type:"line",data:{labels:rk,datasets:[
+      line({label:"FC repouso (bpm)",data:rk.map(k=>(H.daily.RestingHeartRate_bpm||{})[k]??null)},RED,"y"),
+      line({label:"HRV SDNN (ms)",data:rk.map(k=>(H.daily.HRV_SDNN_ms||{})[k]??null)},BLUE,"y1"),
+    ]},options:{maintainAspectRatio:false,interaction:{mode:"index",intersect:false},scales:{y:{position:"left",title:{display:true,text:"bpm"}},y1:{position:"right",grid:{drawOnChartArea:false},title:{display:true,text:"ms"}},x:{ticks:{maxTicksLimit:10}}}}});
+
+    const vk=Object.keys(H.daily.VO2Max||{}).sort().filter(k=>k>="2024-06-01");
+    mk("cVO2",{type:"line",data:{labels:vk,datasets:[line({label:"VO2 Max",data:vk.map(k=>H.daily.VO2Max[k])},GREEN,"y")]},options:{maintainAspectRatio:false,scales:{x:{ticks:{maxTicksLimit:10}}}}});
+
+    const sm=moAvg(H.sleep_hours_by_night||{});const smk=Object.keys(sm).sort().filter(m=>m>="2025-11");
+    mk("cSleep",{type:"bar",data:{labels:smk,datasets:[{label:"h/noite",data:smk.map(m=>sm[m]),backgroundColor:"rgba(59,130,246,.55)"}]},options:{maintainAspectRatio:false,scales:{y:{title:{display:true,text:"h"}}}}});
+  }
+
+  mk("cVolFreq",{data:{labels:tmonths,datasets:[
+    {type:"bar",label:"Volume (kg·rep)",data:tmonths.map(m=>vol[m]),backgroundColor:"rgba(34,197,94,.5)",yAxisID:"y"},
+    {type:"line",label:"Sessões",data:tmonths.map(m=>cnt[m]),borderColor:BLUE,backgroundColor:BLUE,yAxisID:"y1",tension:.25,borderWidth:2},
+  ]},options:{maintainAspectRatio:false,scales:{y:{position:"left"},y1:{position:"right",grid:{drawOnChartArea:false},min:0}}}});
+
+  // progressão
+  const pts=[];sess.forEach(s=>{const e=s.exercises.find(x=>x.name===analProgEx);if(e&&e.top){const e1=Math.max(...e.sets.map(st=>st.w*(1+st.r/30)));pts.push({d:s.date,top:e.top,e1:Math.round(e1)});}});
+  mk("cProg",{type:"line",data:{labels:pts.map(p=>p.d),datasets:[
+    line({label:"Carga máx (kg)",data:pts.map(p=>p.top)},GREEN,"y"),
+    line({label:"1RM est. (kg)",data:pts.map(p=>p.e1)},"rgba(139,151,166,.7)","y"),
+  ]},options:{maintainAspectRatio:false,scales:{x:{ticks:{maxTicksLimit:10}}}}});
+}
+
 /* ---------- AJUSTES ---------- */
 function renderCfg(a){
   a.appendChild(el("h1",null,"Ajustes"));
@@ -617,12 +771,17 @@ function renderCfg(a){
   const c3=el("div","card");
   c3.appendChild(el("h3",null,"Backup"));
   const bar=el("div","row wrap");
-  const exp=el("button","btn-blue btn-sm","⬇ Exportar dados");exp.onclick=()=>download("treino-backup-"+today()+".json",JSON.stringify({templates,sessions,cfg},null,2),"application/json");
+  const exp=el("button","btn-blue btn-sm","⬇ Exportar dados");exp.onclick=downloadBackup;
   const imp=el("button","btn-ghost btn-sm","⬆ Importar");imp.onclick=doImport;
   const allmd=el("button","btn-ghost btn-sm","⬇ Todos os .md");allmd.onclick=exportAllMd;
   bar.appendChild(exp);bar.appendChild(imp);bar.appendChild(allmd);
   c3.appendChild(bar);
-  c3.appendChild(el("div","muted","<hr>"+sessions.length+" treinos salvos · dados guardados só neste aparelho (localStorage)."));
+  // auto-backup ao finalizar
+  const ab=el("div","row");ab.style.marginTop="10px";
+  const abb=el("button",cfg.autoBackup?"btn-primary btn-sm":"btn-ghost btn-sm",cfg.autoBackup?"✓ Backup automático ao finalizar":"Ativar backup automático");
+  abb.onclick=()=>{cfg.autoBackup=!cfg.autoBackup;save(K.cfg,cfg);toast(cfg.autoBackup?"Backup automático ligado":"Desligado");render();};
+  ab.appendChild(abb);c3.appendChild(ab);
+  c3.appendChild(el("div","muted","<hr><b>⚠️ Importante:</b> os dados ficam só neste navegador. O iOS pode apagar o armazenamento do Safari após dias sem uso ou ao limpar histórico. Para não perder nada: mantenha o backup automático ligado e salve o <code>.json</code> gerado na pasta do seu vault (iCloud).<br>"+sessions.length+" treinos salvos · último backup: <b>"+(cfg.lastBackup||"nunca")+"</b>"));
   const rst=el("button","btn-danger btn-sm","Resetar treinos p/ padrão");rst.style.marginTop="8px";
   rst.onclick=()=>{if(confirm("Restaurar os 4 treinos padrão? (histórico é preservado)")){templates=JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));save(K.tpl,templates);toast("Restaurado");render();}};
   c3.appendChild(rst);
@@ -729,6 +888,7 @@ function exportAllMd(){if(!sessions.length){toast("Sem treinos");return;}
   download("Treinos ("+today()+").md",all,"text/markdown");}
 
 /* ============ BOOT ============ */
+requestPersist();
 render();
 </script>
 </body>
