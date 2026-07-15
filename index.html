@@ -660,7 +660,14 @@ function renderAnalise(a){
       +kpi("Massa magra",r1(ll&&ll.v)+" kg",arrow(ll&&ll.v-valAgo(lm,90),true)+" · "+((ll&&ll.v>=g.lean)?"<b style='color:var(--accent)'>🎯 ≥"+g.lean+"</b>":"meta ≥"+g.lean+"kg"))
       +kpi("VO2 Max",r1(latestVal(H.daily.VO2Max||{})&&latestVal(H.daily.VO2Max).v),"")
       +kpi("FC rep (30d)",r1(avgWin(H.daily.RestingHeartRate_bpm,30))+" bpm","")
-      +kpi("HRV (30d)",r1(avgWin(H.daily.HRV_SDNN_ms,30))+" ms","");}
+      +kpi("HRV (30d)",r1(avgWin(H.daily.HRV_SDNN_ms,30))+" ms","");
+    if(H.daily.StepCount)html+=kpi("Passos (méd 30d)",Math.round(avgWin(H.daily.StepCount,30)||0).toLocaleString("pt-BR"),"por dia");
+    if(H.daily.AppleExerciseTime)html+=kpi("Exercício (méd 30d)",r1(avgWin(H.daily.AppleExerciseTime,30))+" min","por dia");}
+  // PRs recentes (último período) — do treino
+  {const prm={};sess.forEach(s=>s.exercises.forEach(e=>{if(e.top>((prm[e.name]||{}).top||0))prm[e.name]={top:e.top,date:s.date};}));
+   const lastDate=sess.length?sess[sess.length-1].date:null;
+   const recent=Object.keys(prm).filter(n=>lastDate&&(new Date(lastDate)-new Date(prm[n].date))/864e5<=45).length;
+   html+=kpi("PRs (últ. 45d)",recent,recent?"novos recordes":"nenhum novo");}
   kp.innerHTML=html;a.appendChild(kp);
 
   // Plano & Ciclo (linha do tempo)
@@ -706,16 +713,23 @@ function renderAnalise(a){
   const pw=el("div");pw.style.cssText="position:relative;height:240px";const pcv=el("canvas");pcv.id="cProg";pw.appendChild(pcv);pc.appendChild(pw);
   grid.appendChild(pc);
   if(H){grid.appendChild(chartCard("Cardio (min/mês)","cCardio","Caminhada · bike · corrida (do Apple Watch)"));
+    if(H.daily.StepCount)grid.appendChild(chartCard("Passos (méd/dia por mês)","cSteps","meta 8.000/dia"));
+    if(H.daily.AppleExerciseTime)grid.appendChild(chartCard("Minutos de exercício (méd/dia por mês)","cExerc","anéis do Watch"));
     grid.appendChild(chartCard("Recuperação (FC repouso × HRV)","cRec","bpm e ms"));
     grid.appendChild(chartCard("VO2 Max","cVO2",""));
     grid.appendChild(chartCard("Sono (méd h/noite por mês)","cSleep","* soma de intervalos — direção confiável, valor absoluto pode inflar"));}
   a.appendChild(grid);
 
-  // PRs
+  // PRs — quando bateu cada recorde (ordenado por data, recentes destacados)
   const prc=el("div","card");prc.style.marginTop="14px";
   const prm={};sess.forEach(s=>s.exercises.forEach(e=>{if(e.top>((prm[e.name]||{}).top||0))prm[e.name]={top:e.top,date:s.date};}));
-  let prh="<h3>Recordes (PR) por exercício</h3><table style='width:100%;border-collapse:collapse;font-size:14px'>";
-  Object.keys(prm).sort((x,y)=>prm[y].top-prm[x].top).forEach(n=>{prh+="<tr style='border-top:1px solid var(--border)'><td style='padding:7px 0'>"+esc(n)+"</td><td style='text-align:right;font-weight:700'>"+prm[n].top+" kg</td><td style='text-align:right;color:var(--muted);padding-left:10px'>"+fmtD(prm[n].date)+"</td></tr>";});
+  const lastDate=sess.length?sess[sess.length-1].date:null;
+  const rows=Object.keys(prm).map(n=>({n,top:prm[n].top,date:prm[n].date}))
+    .sort((x,y)=>x.date<y.date?1:-1); // mais recente primeiro
+  let prh="<div class='row' style='justify-content:space-between'><h3 style='margin:0'>Recordes (PR) — quando bati</h3><span class='muted' style='font-size:12px'>🟢 = PR nos últimos 45 dias</span></div>"+
+    "<table style='width:100%;border-collapse:collapse;font-size:14px;margin-top:6px'>";
+  rows.forEach(r=>{const isRecent=lastDate&&(new Date(lastDate)-new Date(r.date))/864e5<=45;
+    prh+="<tr style='border-top:1px solid var(--border)'><td style='padding:7px 0'>"+(isRecent?"🟢 ":"")+esc(r.n)+"</td><td style='text-align:right;font-weight:700"+(isRecent?";color:var(--accent)":"")+"'>"+r.top+" kg</td><td style='text-align:right;color:var(--muted);padding-left:10px;white-space:nowrap'>"+fmtD(r.date)+"</td></tr>";});
   prh+="</table>";prc.innerHTML=prh;a.appendChild(prc);
   a.appendChild(el("div",null,"<div style='height:40px'></div>"));
 
@@ -791,6 +805,16 @@ function buildCharts(sess,H){
       {type:"line",label:"Meta ~"+goalMin+"min",data:cmk.map(()=>goalMin),borderColor:WARN,borderDash:[5,4],borderWidth:1.5,pointRadius:0,yAxisID:"y"},
       {type:"line",label:"Sessões",data:cmk.map(m=>ccnt[m]),borderColor:BLUE,backgroundColor:BLUE,yAxisID:"y1",tension:.25,borderWidth:2},
     ]},options:{maintainAspectRatio:false,scales:{y:{position:"left",title:{display:true,text:"min"}},y1:{position:"right",grid:{drawOnChartArea:false},min:0,title:{display:true,text:"nº"}}}}});
+
+    // passos (méd/dia por mês)
+    if(H.daily.StepCount){const stm=moAvg(H.daily.StepCount);const stk=Object.keys(stm).sort().filter(m=>m>="2025-11");
+      mk("cSteps",{data:{labels:stk,datasets:[
+        {type:"bar",label:"passos/dia",data:stk.map(m=>Math.round(stm[m])),backgroundColor:"rgba(34,197,94,.5)"},
+        {type:"line",label:"meta 8k",data:stk.map(()=>8000),borderColor:WARN,borderDash:[5,4],borderWidth:1.5,pointRadius:0},
+      ]},options:{maintainAspectRatio:false,scales:{y:{title:{display:true,text:"passos"}}}}});}
+    // minutos de exercício (méd/dia por mês)
+    if(H.daily.AppleExerciseTime){const exm=moAvg(H.daily.AppleExerciseTime);const exk=Object.keys(exm).sort().filter(m=>m>="2025-11");
+      mk("cExerc",{type:"bar",data:{labels:exk,datasets:[{label:"min/dia",data:exk.map(m=>Math.round(exm[m])),backgroundColor:"rgba(59,130,246,.55)"}]},options:{maintainAspectRatio:false,scales:{y:{title:{display:true,text:"min"}}}}});}
   }
 
   mk("cVolFreq",{data:{labels:tmonths,datasets:[
@@ -798,12 +822,13 @@ function buildCharts(sess,H){
     {type:"line",label:"Sessões",data:tmonths.map(m=>cnt[m]),borderColor:BLUE,backgroundColor:BLUE,yAxisID:"y1",tension:.25,borderWidth:2},
   ]},options:{maintainAspectRatio:false,scales:{y:{position:"left"},y1:{position:"right",grid:{drawOnChartArea:false},min:0}}}});
 
-  // progressão
+  // progressão + marcador de PR (quando bateu o recorde)
   const pts=[];sess.forEach(s=>{const e=s.exercises.find(x=>x.name===analProgEx);if(e&&e.top){const e1=Math.max(...e.sets.map(st=>st.w*(1+st.r/30)));pts.push({d:s.date,top:e.top,e1:Math.round(e1)});}});
-  mk("cProg",{type:"line",data:{labels:pts.map(p=>p.d),datasets:[
-    line({label:"Carga máx (kg)",data:pts.map(p=>p.top)},GREEN,"y"),
-    line({label:"1RM est. (kg)",data:pts.map(p=>p.e1)},"rgba(139,151,166,.7)","y"),
-  ]},options:{maintainAspectRatio:false,scales:{x:{ticks:{maxTicksLimit:10}}}}});
+  const prI=pts.length?pts.reduce((bi,p,i,arr)=>p.top>arr[bi].top?i:bi,0):-1;
+  const ds=[line({label:"Carga máx (kg)",data:pts.map(p=>p.top)},GREEN,"y"),
+            line({label:"1RM est. (kg)",data:pts.map(p=>p.e1)},"rgba(139,151,166,.7)","y")];
+  if(prI>=0)ds.push({type:"scatter",label:"⭐ PR "+pts[prI].top+"kg ("+fmtD(pts[prI].d)+")",data:pts.map((p,i)=>i===prI?p.top:null),pointStyle:"star",pointRadius:11,pointHoverRadius:13,borderColor:WARN,backgroundColor:WARN,yAxisID:"y",showLine:false});
+  mk("cProg",{type:"line",data:{labels:pts.map(p=>p.d),datasets:ds},options:{maintainAspectRatio:false,scales:{x:{ticks:{maxTicksLimit:10}}}}});
 }
 
 /* ---------- AJUSTES ---------- */
