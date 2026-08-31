@@ -32,6 +32,8 @@ h1{font-size:20px}h2{font-size:17px}h3{font-size:15px}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px}
 button{font-family:inherit;font-size:15px;cursor:pointer;border:none;border-radius:10px;padding:12px 16px;color:#fff;background:var(--surface2);transition:opacity .15s}
 button:active{opacity:.6}
+button:disabled{opacity:.42;cursor:default}
+button:disabled:active{opacity:.42}
 .btn-primary{background:var(--accent)}
 .btn-blue{background:var(--accent2)}
 .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
@@ -141,9 +143,88 @@ body.wide .wrap{max-width:1180px}
 <script>
 "use strict";
 /* ============ STORE ============ */
-const K = {tpl:"gymlog_templates_v3", sess:"gymlog_sessions_v1", active:"gymlog_active_v1", cfg:"gymlog_cfg_v1"};
-const load = (k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}};
-const save = (k,v)=>localStorage.setItem(k,JSON.stringify(v));
+const K = {tpl:"gymlog_templates_v3", sess:"gymlog_sessions_v1", active:"gymlog_active_v1",
+           cfg:"gymlog_cfg_v1", iolog:"gymlog_iolog_v1"};
+const IOLOG_MAX=60;
+
+/* Registro de gravações/leituras. Grava direto no localStorage — nunca chama
+   save(), para não recursar quando o próprio save() falhar. */
+function logIO(kind,key,msg,bytes){
+  const rec={t:Date.now(),kind:kind,key:key,msg:String(msg==null?"":msg).slice(0,220)};
+  if(bytes!=null)rec.bytes=bytes;
+  try{
+    const raw=localStorage.getItem(K.iolog);
+    const arr=raw?JSON.parse(raw):[];
+    arr.push(rec);
+    localStorage.setItem(K.iolog,JSON.stringify(arr.slice(-IOLOG_MAX)));
+  }catch(e){}
+  return rec;
+}
+/* Nem tudo que não é "ok" é falha: export bem-sucedido é "backup" e cancelamento é
+   "backup-cancel" — cancelar não é erro e não pode ser contado nem pintado como um. */
+const IO_NAO_FALHA={ok:1,backup:1,"backup-cancel":1};
+function ioFail(r){return !IO_NAO_FALHA[r&&r.kind];}
+function ioLogRead(){try{const r=localStorage.getItem(K.iolog);return r?JSON.parse(r):[];}catch(e){return [];}}
+
+/* Antes: qualquer erro devolvia o default silenciosamente — um JSON corrompido
+   virava [] e o save seguinte apagava o histórico. Agora preserva o bruto e registra. */
+const load=(k,d)=>{
+  let raw;
+  try{ raw=localStorage.getItem(k); }
+  catch(e){ logIO("read-fail",k,e.message); return d; }
+  if(raw==null||raw==="") return d;
+  try{ return JSON.parse(raw); }
+  catch(e){
+    try{ localStorage.setItem(k+"__corrompido_"+Date.now(),raw); }catch(_){}
+    logIO("parse-fail",k,e.message+" — cópia bruta preservada",raw.length);
+    return d;
+  }
+};
+/* Devolve true/false em vez de estourar em silêncio. Confere relendo o que gravou. */
+const save=(k,v)=>{
+  let str;
+  try{ str=JSON.stringify(v); }
+  catch(e){ logIO("stringify-fail",k,e.message); return false; }
+  try{ localStorage.setItem(k,str); }
+  catch(e){ logIO("write-fail",k,e.message,str.length); return false; }
+  try{ if(localStorage.getItem(k)!==str){ logIO("verify-fail",k,"releitura difere do gravado",str.length); return false; } }
+  catch(e){ logIO("verify-fail",k,e.message); return false; }
+  return true;
+};
+
+/* ---------- VALIDAÇÃO DE SESSÃO ---------- */
+/* erros = bloqueiam o salvamento · avisos = informam, não bloqueiam */
+function validateSession(s){
+  const erros=[],avisos=[];
+  if(!s||typeof s!=="object")return{erros:["sessão inexistente"],avisos:avisos,stats:{}};
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(s.date||""))erros.push("data ausente ou fora do formato AAAA-MM-DD");
+  if(!s.day)erros.push("dia do treino (A/B/C/D) ausente");
+  if(!Array.isArray(s.exercises)||!s.exercises.length)erros.push("nenhum exercício com série preenchida");
+  let sets=0,comReps=0,comCarga=0,vol=0;
+  (s.exercises||[]).forEach((e,i)=>{
+    const nome=((e&&e.n)||"").trim();
+    if(!nome)erros.push("exercício "+(i+1)+" está sem nome");
+    if(!Array.isArray(e.sets)){erros.push((nome||"exercício "+(i+1))+": lista de séries inválida");return;}
+    if(!e.sets.length)avisos.push((nome||"exercício "+(i+1))+" ficou sem série");
+    e.sets.forEach(st=>{
+      sets++;
+      const r=parseFloat(st.r),w=parseFloat(st.w);
+      if(!isNaN(r)&&r>0){comReps++;if(!isNaN(w)&&w>0){comCarga++;vol+=w*r;}}
+    });
+  });
+  if(!sets)erros.push("nenhuma série registrada");
+  else if(!comReps)erros.push("as "+sets+" séries estão todas sem repetições");
+  if(s.started&&s.finished&&s.finished<s.started)erros.push("término anterior ao início");
+  return{erros:erros,avisos:avisos,stats:{exercicios:(s.exercises||[]).length,sets:sets,
+    comReps:comReps,comCarga:comCarga,vol:Math.round(vol),
+    dur:(s.started&&s.finished)?Math.round((s.finished-s.started)/60000):null}};
+}
+function storageInfo(){
+  let total=0;const det={};
+  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);const v=localStorage.getItem(k)||"";
+    det[k]=v.length;total+=v.length+k.length;}}catch(e){}
+  return{total:total,det:det};
+}
 
 /* Templates do vault Obsidian — Ciclo 3 (01 Junho 2026, treino-atual) */
 const DEFAULT_TEMPLATES = {
@@ -182,9 +263,26 @@ const DEFAULT_TEMPLATES = {
   ]},
 };
 
+/* Cada exercício da sessão ativa ganha um id estável. O "exercício ativo" passa a
+   ser o do último set logado (ultimoExercicioId) — não a posição na lista. */
+function ensureIds(a){
+  if(!a||!Array.isArray(a.exercises))return a;
+  let n=a.nextEid||0;
+  a.exercises.forEach(e=>{if(!e.id)e.id="x"+(n++);});
+  a.nextEid=n;
+  return a;
+}
+/* Chamado sempre que uma série ganha repetições. Carimba o horário só na primeira
+   vez (preserva quando foi feita de verdade) e move o "ativo" para este exercício.
+   É a mesma fonte que alimenta a reordenação por última execução (execOrderOf). */
+function touchSet(e,st){
+  if(String(st.r==null?"":st.r).trim()==="")return;
+  if(!st.t)st.t=Date.now();
+  if(active){active.ultimoExercicioId=e.id;active.ultimoSetAt=Date.now();}
+}
 let templates = load(K.tpl, null) || DEFAULT_TEMPLATES;
 let sessions  = load(K.sess, []);
-let active    = load(K.active, null);
+let active    = ensureIds(load(K.active, null));   // retrocompat: sessão salva sem id
 let cfg       = load(K.cfg, {ciclo:"C4", plano:"ABCD", musicUrl:""});
 const GOALS_DEFAULT={weight:[81,83], fat:[15,17], lean:66}; // metas de recomposição
 function goals(){return cfg.goals||GOALS_DEFAULT;}
@@ -216,17 +314,27 @@ function refreshSbIdle(){if(!active)return;const p=$("#sbProg"),v=$("#sbVol");
   if(p)p.textContent=done+"/"+active.exercises.length+" ex";
   if(v)v.textContent=Math.round(sessVol(active))+" kg·rep";}
 function updateSessionBar(){const sb=$("#sessionbar");if(!sb)return;
-  if(tab==="log"&&active){sb.classList.add("on");refreshSbIdle();startElapsed();}
-  else{sb.classList.remove("on","resting");clearInterval(swId);clearInterval(elapsedId);}}
+  if(tab==="log"&&active){sb.classList.add("on");refreshSbIdle();startElapsed();resumeRest();}
+  else{sb.classList.remove("on","resting","over");clearInterval(swId);swId=null;clearInterval(elapsedId);}}
 function openMusic(){if(!cfg.musicUrl){toast("Configure a playlist em Ajustes");go("cfg");return;}
   window.open(cfg.musicUrl,"_blank");}
 function openExDemo(name){window.open("https://www.google.com/search?tbm=isch&q="+encodeURIComponent(name+" exercício execução academia"),"_blank");}
 
 /* ============ CRONÔMETRO DE DESCANSO (conta pra cima, grava a pausa real) ============ */
 let swId=null, swStart=0, swTarget=0, swExIdx=-1, swBeeped=false;
-function startRest(exIdx){const e=active.exercises[exIdx]||{};swExIdx=exIdx;swStart=Date.now();swBeeped=false;
+/* `resumeTs` = retomada (reload ou volta de outra aba). O swStart já era timestamp
+   absoluto, então app em background nunca distorceu a contagem — o buraco era que ele
+   vivia só em memória: persistActive() salvava `active` sem ele e o reload zerava a
+   pausa. Agora o carimbo mora em active.restTimer. */
+function startRest(exIdx,resumeTs){const e=active.exercises[exIdx]||{};swExIdx=exIdx;
+  swStart=resumeTs||Date.now();swBeeped=false;
+  if(!resumeTs){
+    if(e.id&&active){active.ultimoExercicioId=e.id;active.ultimoSetAt=Date.now();}
+    if(active){active.restTimer={s:swStart,i:exIdx};persistActive();}
+  }
   const inter=targetSets(e)&&completedSets(e)>=targetSets(e);
   swTarget=inter?INTER_REST:(e.rest||0);
+  if(resumeTs&&swTarget&&(Date.now()-swStart)/1000>=swTarget)swBeeped=true;  // a meta passou antes do reload: não bipa retroativo
   const lb=$("#sbRestLbl");if(lb)lb.textContent=inter?"ENTRE EXERCÍCIOS":"DESCANSO";
   const tg=$("#sbRestTgt");if(tg)tg.textContent=swTarget?"(meta "+(inter?"2min":swTarget+"s")+")":"";
   const sb=$("#sessionbar");if(sb){sb.classList.add("on","resting");sb.classList.remove("over");}swTick();clearInterval(swId);swId=setInterval(swTick,250);}
@@ -238,25 +346,36 @@ function swTick(){const sec=Math.floor((Date.now()-swStart)/1000);
   if(over&&!swBeeped){swBeeped=true;beep();}}
 function markLap(){const sec=Math.round((Date.now()-swStart)/1000);
   const e=active.exercises[swExIdx];
-  if(e){if(e.sets.length){const ls=e.sets[e.sets.length-1];ls.rest=sec;ls.t=Date.now();}
+  if(e){active.ultimoExercicioId=e.id;active.ultimoSetAt=Date.now();
+    if(e.sets.length){const ls=e.sets[e.sets.length-1];ls.rest=sec;ls.t=Date.now();}
     if(targetSets(e)&&completedSets(e)>=targetSets(e)){e.done=true;e.open=false;} // alvo atingido → conclui exercício
     else{const last=e.sets[e.sets.length-1]||{};e.sets.push({w:last.w||"",r:last.r||"",rir:last.rir||""});}
     persistActive();}
   stopRest();render();
   toast(sec+"s registrado");}
-function stopRest(){clearInterval(swId);const sb=$("#sessionbar");if(sb)sb.classList.remove("resting","over");}
+function stopRest(){clearInterval(swId);swId=null;
+  if(active&&active.restTimer){delete active.restTimer;persistActive();}
+  const sb=$("#sessionbar");if(sb)sb.classList.remove("resting","over");}
+/* Chamado a cada render da aba de treino: reload ou volta de outra aba recuperam a
+   pausa em curso pelo carimbo salvo, em vez de perdê-la. */
+function resumeRest(){
+  if(swId)return;                                        // já contando
+  const r=active&&active.restTimer;
+  if(!r||!active.exercises[r.i])return;
+  startRest(r.i,r.s);
+}
 function beep(){try{const c=new(window.AudioContext||window.webkitAudioContext)();const o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;g.gain.value=.1;o.start();setTimeout(()=>{o.stop();c.close();},400);}catch(e){}
   if(navigator.vibrate)navigator.vibrate([200,80,200]);}
 
 /* ============ NAV ============ */
 function isDesktop(){return window.matchMedia("(min-width: 900px)").matches;}
-function go(t){tab=t;render();window.scrollTo(0,0);}
+function go(t){tab=t;bkState={phase:"idle"};render();window.scrollTo(0,0);}  // relatório de export é do toque, não do dia
 function renderTabs(){
   const tabs=[["home","🏠","Treinar"],["hist","📈","Histórico"]];
   if(isDesktop())tabs.push(["analise","📊","Análise"]);
   tabs.push(["cfg","⚙️","Ajustes"]);
   const tb=$("#tabbar");tb.innerHTML="";
-  tabs.forEach(([id,ic,lb])=>{const b=el("button",(tab===id||(id==="home"&&tab==="log"))?"active":"","<span class='ic'>"+ic+"</span>"+lb);
+  tabs.forEach(([id,ic,lb])=>{const b=el("button",(tab===id||(id==="home"&&(tab==="log"||tab==="save")))?"active":"","<span class='ic'>"+ic+"</span>"+lb);
     b.onclick=()=>go(id);tb.appendChild(b);});
 }
 
@@ -268,6 +387,7 @@ function render(){renderTabs();const a=$("#app");a.innerHTML="";
   else if(tab==="home") renderHome(a);
   else if(tab==="hist") renderHist(a);
   else if(tab==="analise") renderAnalise(a);
+  else if(tab==="save") renderSave(a);
   else if(tab==="cfg")  renderCfg(a);
   else renderHome(a);
   updateSessionBar();
@@ -313,11 +433,48 @@ function lastSessionFor(d){const f=sessions.filter(s=>s.day===d);return f.length
 function sessVol(s){return s.exercises.reduce((a,e)=>a+setVol(e.sets),0);}
 
 /* ---------- START / LOG ---------- */
+/* ---------- ORDEM DE EXECUÇÃO ---------- */
+// Ordem real em que os exercícios foram feitos numa sessão: usa o timestamp
+// da 1ª série de cada um; sem timestamp (sessões importadas) cai na ordem gravada.
+function execOrderOf(sess){
+  return (sess.exercises||[])
+    .map((e,i)=>{const ts=(e.sets||[]).map(s=>s.t).filter(Boolean);
+                 return {n:e.n,t:ts.length?Math.min.apply(null,ts):Infinity,i:i};})
+    .sort((a,b)=>(a.t-b.t)||(a.i-b.i))      // Infinity-Infinity=NaN (falsy) -> desempata por i
+    .map(x=>x.n);
+}
+// Última sessão REPRESENTATIVA do dia: a mais recente que cobriu pelo menos 60%
+// dos exercícios do template. Evita que um treino abortado (ex.: 1 exercício)
+// bagunce a ordem de todos os próximos.
+function refSessionFor(d){
+  const t=templates[d]; if(!t) return null;
+  const min=Math.max(2,Math.ceil((t.ex||[]).length*0.6));
+  const f=sessions.filter(s=>s.day===d);
+  for(let i=f.length-1;i>=0;i--){
+    const n=(f[i].exercises||[]).filter(e=>(e.sets||[]).length).length;
+    if(n>=min) return f[i];
+  }
+  return null;
+}
+// Reordena os exercícios do template na ordem da última sessão representativa.
+// Exercícios novos (que não estavam nela) mantêm a ordem do template, no fim.
+function orderLikeLast(d,exs){
+  const last=refSessionFor(d);
+  if(!last||!(last.exercises||[]).length) return exs;
+  const idx=new Map(execOrderOf(last).map((n,i)=>[n,i]));
+  return exs.map((e,i)=>({e:e,i:i}))
+    .sort((a,b)=>{const ia=idx.has(a.e.n)?idx.get(a.e.n):Infinity,
+                        ib=idx.has(b.e.n)?idx.get(b.e.n):Infinity;
+                  return (ia-ib)||(a.i-b.i);})
+    .map(x=>x.e);
+}
+
 function startSession(d){
   if(active && !confirm("Já existe um treino em andamento. Descartar e começar "+d+"?"))return;
   const t=templates[d];
   active={day:d,date:today(),ciclo:cfg.ciclo,plano:cfg.plano,started:Date.now(),
-    exercises:t.ex.map(e=>({n:e.n,sr:e.sr,rest:e.rest,mvw:e.mvw,notes:e.notes,sets:[]}))};
+    exercises:orderLikeLast(d,t.ex).map(e=>({n:e.n,sr:e.sr,rest:e.rest,mvw:e.mvw,notes:e.notes,sets:[]}))};
+  ensureIds(active);
   save(K.active,active);go("log");
 }
 function persistActive(){save(K.active,active);}
@@ -334,11 +491,16 @@ function renderLog(a){
 
   // feitos vão pro fim da lista (ordem estável)
   const order=active.exercises.map((e,i)=>i).sort((x,y)=>(active.exercises[x].done?1:0)-(active.exercises[y].done?1:0));
-  const activeIdx=active.exercises.findIndex(e=>!e.done);
+  // ativo = exercício do último set logado; antes de logar qualquer coisa, o 1º não concluído
+  let activeIdx=active.ultimoExercicioId
+    ? active.exercises.findIndex(e=>e.id===active.ultimoExercicioId) : -1;
+  if(activeIdx<0)activeIdx=active.exercises.findIndex(e=>!e.done);
   order.forEach(i=>a.appendChild(exCard(active.exercises[i],i,i===activeIdx)));
 
   const addBtn=el("button","btn-ghost","+ Adicionar exercício");addBtn.style.width="100%";addBtn.style.marginBottom="12px";
-  addBtn.onclick=()=>{const n=prompt("Nome do exercício:");if(!n)return;active.exercises.push({n,sr:"3×10",rest:60,mvw:false,notes:"",sets:[]});persistActive();render();};
+  addBtn.onclick=()=>{const n=prompt("Nome do exercício:");if(!n)return;
+    active.exercises.push({n,sr:"3×10",rest:60,mvw:false,notes:"",sets:[]});
+    ensureIds(active);persistActive();render();};
   a.appendChild(addBtn);
 
   const fin=el("button","btn-primary","✓ Finalizar treino");fin.style.width="100%";fin.onclick=finishSession;
@@ -418,7 +580,7 @@ function exCard(e,ei,isActive){
     const r=el("div","setrow");
     r.appendChild(el("div","idx",(si+1)));
     const w=inp(s.w,"kg",v=>{s.w=v;persistActive();updVol(c);});
-    const rp=inp(s.r,"reps",v=>{s.r=v;persistActive();updVol(c);});
+    const rp=inp(s.r,"reps",v=>{s.r=v;touchSet(e,s);persistActive();updVol(c);});
     const ri=inp(s.rir,"RIR",v=>{s.rir=v;persistActive();});
     r.appendChild(w);r.appendChild(rp);r.appendChild(ri);
     const d=el("button","del","×");d.onclick=()=>{e.sets.splice(si,1);persistActive();render();};
@@ -455,21 +617,229 @@ function lastLogFor(name,day){
   return null;
 }
 
+let pendingSave=null;   // {sess, v, res} — alimenta a tela de confirmação
 function finishSession(){
-  const withSets={...active,exercises:active.exercises.filter(e=>e.sets.length).map(({done,open,...e})=>e)};
-  if(!withSets.exercises.length){toast("Registre ao menos uma série");return;}
-  withSets.finished=Date.now();
-  // carimba série sem timestamp (última de cada exercício / adicionadas manualmente)
-  withSets.exercises.forEach(e=>e.sets.forEach(st=>{if(!st.t)st.t=withSets.finished;}));
-  sessions.push(withSets);save(K.sess,sessions);
-  active=null;localStorage.removeItem(K.active);
-  toast("Treino salvo ✓");
-  if(cfg.autoBackup)downloadBackup();
-  showMarkdown(withSets);
+  // descarta séries em branco e exercícios que ficaram sem nenhuma série válida
+  const exs=active.exercises
+    .map(({done,open,id,...e})=>({...e,sets:(e.sets||[]).filter(st=>String(st.r==null?"":st.r).trim()!=="")}))
+    .filter(e=>e.sets.length);
+  const {ultimoExercicioId,ultimoSetAt,nextEid,restTimer,...limpo}=active;
+  const sess={...limpo,exercises:exs,finished:Date.now()};
+  sess.exercises.forEach(e=>e.sets.forEach(st=>{if(!st.t)st.t=sess.finished;}));
+
+  const v=validateSession(sess);
+  if(v.erros.length){                              // não salva calado
+    logIO("validate-fail",K.sess,v.erros.join(" | "));
+    pendingSave={sess:sess,v:v,res:null};go("save");return;
+  }
+  const antes=(load(K.sess,[])||[]).length;
+  sessions.push(sess);
+  if(!save(K.sess,sessions)){
+    sessions.pop();
+    pendingSave={sess:sess,v:v,res:{ok:false,msg:"o navegador recusou a gravação — veja Ajustes → Diagnóstico de dados"}};
+    go("save");return;
+  }
+  const relido=load(K.sess,null);                  // prova de que foi gravado mesmo
+  if(!Array.isArray(relido)||relido.length!==antes+1){
+    logIO("readback-fail",K.sess,"esperado "+(antes+1)+" treinos, releitura trouxe "+(Array.isArray(relido)?relido.length:"nada"));
+    sessions.pop();
+    pendingSave={sess:sess,v:v,res:{ok:false,msg:"o armazenamento não confirmou a gravação"}};
+    go("save");return;
+  }
+  logIO("ok",K.sess,"treino "+sess.day+" "+sess.date+" · "+v.stats.sets+" séries · "+v.stats.vol+" kg·rep",
+        JSON.stringify(sessions).length);
+  active=null;try{localStorage.removeItem(K.active);}catch(e){}
+  pendingSave={sess:sess,v:v,res:{ok:true,total:relido.length}};
+  go("save");
 }
-function downloadBackup(){cfg.lastBackup=today();save(K.cfg,cfg);
-  toast("Backup: "+sessions.length+" treinos → salve no vault");
-  download("treino-backup-"+today()+".json",JSON.stringify({templates,sessions,cfg},null,2),"application/json");}
+
+/* ---------- CONFIRMAÇÃO DE SALVAMENTO ---------- */
+function renderSave(a){
+  const P=pendingSave;
+  if(!P){go("home");return;}
+  const sess=P.sess,v=P.v,res=P.res,ok=!!(res&&res.ok);
+
+  a.appendChild(el("div","row","<div style='flex:1'><h1>"+(ok?"Treino salvo":"Não foi salvo")+
+    "</h1><div class='muted'>Treino "+esc(sess.day)+" · "+esc(sess.date)+"</div></div>"));
+
+  const st=el("div","card");
+  st.style.borderColor=ok?"var(--accent)":"var(--danger)";
+  if(ok){
+    st.innerHTML="<div style='font-weight:700;color:var(--accent)'>✓ Gravado e conferido por releitura</div>"+
+      "<div class='muted' style='margin-top:4px'>O armazenamento devolveu <b>"+res.total+"</b> treinos no histórico.</div>";
+  }else{
+    st.innerHTML="<div style='font-weight:700;color:var(--danger)'>✕ "+
+      esc(res?res.msg:"Sessão incompleta — nada foi gravado")+"</div>"+
+      (v.erros.length?"<ul style='margin:8px 0 0 18px;padding:0'>"+
+        v.erros.map(x=>"<li>"+esc(x)+"</li>").join("")+"</ul>":"");
+  }
+  a.appendChild(st);
+
+  if(v.avisos.length){
+    const w=el("div","card");w.style.borderColor="var(--warn)";
+    w.innerHTML="<div style='font-weight:650;color:var(--warn)'>Avisos</div>"+
+      "<ul style='margin:8px 0 0 18px;padding:0'>"+v.avisos.map(x=>"<li>"+esc(x)+"</li>").join("")+"</ul>";
+    a.appendChild(w);
+  }
+
+  // conteúdo REAL, não um toast genérico
+  const c=el("div","card");
+  c.appendChild(el("h3",null,ok?"Conteúdo salvo":"Conteúdo que seria salvo"));
+  const g=el("div","row");g.style.cssText="gap:18px;flex-wrap:wrap;margin-bottom:6px";
+  [["EXERCÍCIOS",v.stats.exercicios],["SÉRIES",v.stats.sets],
+   ["VOLUME",(v.stats.vol||0)+" kg·rep"],["DURAÇÃO",v.stats.dur?v.stats.dur+" min":"—"]]
+   .forEach(function(p){const b=el("div");
+     b.innerHTML="<div class='sb-lbl'>"+p[0]+"</div><div style='font-weight:700;font-variant-numeric:tabular-nums'>"+p[1]+"</div>";
+     g.appendChild(b);});
+  c.appendChild(g);
+  sess.exercises.forEach(e=>{
+    const r=el("div");r.style.cssText="padding:8px 0;border-top:1px solid var(--border)";
+    r.innerHTML="<div style='font-weight:600'>"+esc(e.n)+"</div>"+
+      "<div class='muted' style='font-size:13px;font-variant-numeric:tabular-nums'>"+esc(fmtSets(e.sets))+"</div>";
+    c.appendChild(r);});
+  a.appendChild(c);
+
+  if(ok){                     // o backup precisa de bloco próprio: é ele que se reescreve
+    const bkc=el("div","card");
+    bkc.appendChild(el("h3",null,"Backup pro vault"));
+    const bkh=el("div");renderBackupBlock(bkh);bkc.appendChild(bkh);
+    a.appendChild(bkc);
+  }
+  const bar=el("div","row wrap");
+  if(ok){
+    const md=el("button","btn-blue","📋 Markdown");md.onclick=()=>showMarkdown(sess);
+    const hm=el("button","btn-ghost","Início");hm.onclick=()=>{pendingSave=null;go("home");};
+    bar.appendChild(md);bar.appendChild(hm);
+  }else{
+    const vo=el("button","btn-primary","← Voltar e corrigir");
+    vo.onclick=()=>{pendingSave=null;go(active?"log":"home");};
+    const dg=el("button","btn-ghost","Diagnóstico");dg.onclick=()=>{pendingSave=null;go("cfg");};
+    bar.appendChild(vo);bar.appendChild(dg);
+  }
+  a.appendChild(bar);
+  /* O parágrafo que ficava aqui prometia "~150 KB" e chamava ~30 bytes de falha do iOS
+     (v1.3.2 tirou o mito). Agora o número não é promessa: sai do próprio arquivo, depois
+     do export, dentro do bloco de backup acima. */
+  a.appendChild(el("div",null,"<div style='height:110px'></div>"));
+}
+/* Conteúdo real do backup, sem abrir o arquivo: o que a tela promete tem que ser
+   o que o export leva. */
+function backupStats(){
+  const sets=sessions.reduce((a,x)=>a+(x.exercises||[]).reduce((b,e)=>b+(e.sets||[]).length,0),0);
+  const ds=sessions.map(x=>x.date).filter(Boolean).sort();
+  return {treinos:sessions.length,sets:sets,de:ds[0]||null,ate:ds[ds.length-1]||null};
+}
+/* ---------- BACKUP PRO VAULT — um toque, um arquivo ---------- */
+/* Até a v1.3.2 um toque de export disparava três shares (backup, treinos.json e .md),
+   cada um abrindo share sheet e deixando lixo, e dois deles sem consumidor nenhum: o
+   recolher_treino.py classifica `gymlog/*` como ignorar e regenera o treinos.json a
+   partir do backup, e nunca leu o .md do celular.
+   O toast antigo disparava ANTES do share e nunca reportava resultado — dizia "backup:
+   N treinos" mesmo quando o usuário cancelava. Agora o card se reescreve no lugar,
+   depois do share resolver, com o que saiu de fato. Cancelar e falhar são estados
+   distintos e nomeados; em nenhum dos dois o botão some. */
+let bkState={phase:"idle"};   // idle | busy | done | abort | fail
+
+function renderBackupBlock(host){
+  host.innerHTML="";
+  const st=backupStats(), S=bkState;
+  const b=el("button","btn-primary","⬇ Backup pro vault");
+  b.style.width="100%";
+
+  if(!st.treinos){                                   // VAZIO — desabilitado, não some
+    b.disabled=true;b.title="Nada pra exportar";
+    host.appendChild(b);
+    host.appendChild(el("div","muted","Nada pra exportar: <b>0 treinos</b> no histórico. "+
+      "O botão volta assim que o primeiro treino for salvo."));
+    return;
+  }
+  if(S.phase==="busy"){                              // CARREGANDO — recusa segundo toque
+    b.disabled=true;b.textContent="⬇ Compartilhamento aberto…";
+  }else{
+    b.onclick=()=>runBackup(host);
+  }
+  host.appendChild(b);
+
+  if(S.phase==="busy"){
+    host.appendChild(el("div","muted","Escolha <b>Salvar em Arquivos → iCloud Drive</b>. "+
+      "Não toque de novo enquanto isso: o segundo toque exporta um arquivo duplicado."));
+  }else if(S.phase==="done"){                        // CHEIO — o que saiu de fato
+    const d=el("div");d.style.cssText="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)";
+    d.innerHTML="<div style='font-weight:700;color:var(--accent)'>✓ "+
+        (S.via==="share"?"Entregue ao compartilhamento":"Baixado")+" às "+esc(S.hora)+"</div>"+
+      "<div style='margin-top:4px;font-variant-numeric:tabular-nums'><b>"+S.treinos+"</b> "+
+        (S.treinos===1?"treino":"treinos")+" · <b>"+S.sets+"</b> "+(S.sets===1?"série":"séries")+
+        (S.de?" · "+esc(S.de)+" → "+esc(S.ate):"")+" · <b>"+S.kb+" KB</b></div>"+
+      "<div class='muted' style='margin-top:2px'><code>"+esc(S.fn)+"</code></div>"+
+      "<div class='muted' style='margin-top:6px'>Salve em <b>iCloud Drive</b> — a raiz serve. "+
+        "O app entrega o arquivo ao iOS e não enxerga onde ele parou: confira em <b>Arquivos</b>.</div>"+
+      (S.cfgOk?"":"<div style='margin-top:6px;color:var(--warn);font-weight:650'>⚠ O arquivo saiu, "+
+        "mas a data do último backup não pôde ser gravada — veja Ajustes → Diagnóstico de dados.</div>");
+    host.appendChild(d);
+  }else if(S.phase==="abort"){                       // CANCELADO — não é erro
+    const d=el("div");d.style.cssText="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)";
+    d.innerHTML="<div style='font-weight:650'>Export cancelado às "+esc(S.hora)+"</div>"+
+      "<div class='muted' style='margin-top:2px'>Você fechou o compartilhamento antes de escolher onde salvar. "+
+      "Nada saiu e nada foi perdido — o histórico continua aqui. Toque de novo quando quiser.</div>";
+    host.appendChild(d);
+  }else if(S.phase==="fail"){                        // ERRO — motivo visível
+    const d=el("div");d.style.cssText="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)";
+    d.innerHTML="<div style='font-weight:700;color:var(--danger)'>✕ O backup não saiu ("+esc(S.hora)+")</div>"+
+      "<div class='muted' style='margin-top:2px'>Motivo: "+esc(S.msg)+"</div>"+
+      "<div class='muted' style='margin-top:4px'>O histórico não foi tocado. Registrado em "+
+      "Ajustes → Diagnóstico de dados → Log de gravações.</div>";
+    host.appendChild(d);
+  }
+}
+
+async function runBackup(host){
+  if(bkState.phase==="busy")return;                  // segundo toque não passa
+  const st=backupStats();
+  const fn="treino-backup-"+today()+".json";
+  const hora=fmtClock(Date.now());
+  if(!st.treinos){bkState={phase:"fail",fn:fn,hora:hora,msg:"nenhum treino no histórico"};
+    renderBackupBlock(host);return;}
+  let payload;
+  try{ payload=JSON.stringify({templates,sessions,cfg},null,2); }
+  catch(e){ const m=(e&&e.message)||String(e);
+    logIO("backup-fail",K.sess,"não deu pra montar o JSON: "+m);
+    bkState={phase:"fail",fn:fn,hora:hora,msg:"não deu pra montar o JSON — "+m};
+    renderBackupBlock(host);return; }
+  const blob=new Blob([payload],{type:"application/json"});
+  bkState={phase:"busy",fn:fn};renderBackupBlock(host);
+
+  let via=null;
+  try{
+    let file=null;
+    try{ if(navigator.canShare&&window.File){
+            const f=new File([blob],fn,{type:"application/json"});
+            if(navigator.canShare({files:[f]}))file=f; } }catch(e){ file=null; }
+    if(file){ await navigator.share({files:[file]}); via="share"; }  // só `files`: `title` virava um segundo item
+    else{                                                            // fallback desktop
+      const u=URL.createObjectURL(blob);const a=document.createElement("a");a.href=u;a.download=fn;
+      document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500);
+      via="download";
+    }
+  }catch(e){
+    const fim=fmtClock(Date.now());
+    if(e&&e.name==="AbortError"){                    // cancelar não é falhar
+      logIO("backup-cancel",K.sess,"export cancelado antes de escolher destino — nada saiu");
+      bkState={phase:"abort",fn:fn,hora:fim};
+    }else{
+      const m=(e&&e.message)||String(e);
+      logIO("backup-fail",K.sess,"share recusou: "+m);
+      bkState={phase:"fail",fn:fn,hora:fim,msg:m};
+    }
+    renderBackupBlock(host);return;
+  }
+  cfg.lastBackup=today();
+  const cfgOk=save(K.cfg,cfg);
+  logIO("backup",K.sess,st.treinos+" treinos · "+st.sets+" séries · "+fn+" · via "+via,blob.size);
+  bkState={phase:"done",fn:fn,hora:fmtClock(Date.now()),kb:Math.round(blob.size/1024),via:via,
+           treinos:st.treinos,sets:st.sets,de:st.de,ate:st.ate,cfgOk:cfgOk};
+  const lb=$("#cfgLastBk");if(lb)lb.textContent=cfg.lastBackup;   // a linha de aviso do card não fica atrasada
+  renderBackupBlock(host);
+}
 function requestPersist(){try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}}
 
 /* ---------- MARKDOWN EXPORT ---------- */
@@ -505,24 +875,14 @@ function showMarkdown(s){
   const c=el("div","card");c.appendChild(ta);
   const bar=el("div","row wrap");bar.style.marginTop="10px";
   const cp=el("button","btn-primary","📋 Copiar");cp.onclick=()=>{navigator.clipboard.writeText(md).then(()=>toast("Copiado ✓"),()=>toast("Selecione e copie"));};
-  const dl=el("button","btn-blue","⬇ Baixar .md");dl.onclick=()=>download("Treino "+s.day+" ("+s.date+").md",md,"text/markdown");
   const bk=el("button","btn-ghost","← Voltar");bk.onclick=()=>go("home");
-  bar.appendChild(cp);bar.appendChild(dl);bar.appendChild(bk);
+  bar.appendChild(cp);bar.appendChild(bk);   // v1.4.0: "⬇ Baixar .md" saiu — abria share sheet e ninguém lia o .md
   c.appendChild(bar);a.appendChild(c);
   a.appendChild(el("div","muted","Cole no seu vault em <b>54 Saúde &amp; Fitness / 54.01 Academia</b>. Os <code>[[exercícios]]</code> viram wikilinks automaticamente."));
 }
-async function download(fn,content,type){
-  const blob=new Blob([content],{type});
-  // iOS/celular: share sheet ("Salvar em Arquivos") é o único jeito confiável
-  try{
-    if(navigator.canShare){
-      const file=new File([blob],fn,{type});
-      if(navigator.canShare({files:[file]})){await navigator.share({files:[file],title:fn});return true;}
-    }
-  }catch(e){if(e&&e.name==="AbortError")return false;} // usuário cancelou
-  // fallback desktop
-  const u=URL.createObjectURL(blob);const a=document.createElement("a");a.href=u;a.download=fn;
-  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500);return true;}
+/* v1.4.0: o download() genérico saiu junto com os exports que ele servia. Ele engolia
+   o AbortError num `return false` que ninguém lia — a cicatriz nº2 na tela de export.
+   Quem exporta agora é o runBackup(), que nomeia cancelamento e falha na tela. */
 
 /* ---------- HISTÓRICO / CHARTS ---------- */
 let histEx=null, histMetric="peso";
@@ -871,18 +1231,19 @@ function renderCfg(a){
   // backup
   const c3=el("div","card");
   c3.appendChild(el("h3",null,"Backup"));
-  const bar=el("div","row wrap");
-  const exp=el("button","btn-blue btn-sm","⬇ Exportar dados");exp.onclick=downloadBackup;
+  /* v1.4.0: "⬇ Exportar dados" e "⬇ Todos os .md" viraram um botão só, com o mesmo
+     rótulo da tela de fim de treino — é a mesma coisa, não duas. O .md nunca teve
+     consumidor: o recolher_treino.py não lê .md vindo do celular. */
+  const bkh=el("div");renderBackupBlock(bkh);c3.appendChild(bkh);
+  const bar=el("div","row wrap");bar.style.marginTop="10px";
   const imp=el("button","btn-ghost btn-sm","⬆ Importar");imp.onclick=doImport;
-  const allmd=el("button","btn-ghost btn-sm","⬇ Todos os .md");allmd.onclick=exportAllMd;
-  bar.appendChild(exp);bar.appendChild(imp);bar.appendChild(allmd);
+  bar.appendChild(imp);
   c3.appendChild(bar);
-  // auto-backup ao finalizar
-  const ab=el("div","row");ab.style.marginTop="10px";
-  const abb=el("button",cfg.autoBackup?"btn-primary btn-sm":"btn-ghost btn-sm",cfg.autoBackup?"✓ Backup automático ao finalizar":"Ativar backup automático");
-  abb.onclick=()=>{cfg.autoBackup=!cfg.autoBackup;save(K.cfg,cfg);toast(cfg.autoBackup?"Backup automático ligado":"Desligado");render();};
-  ab.appendChild(abb);c3.appendChild(ab);
-  c3.appendChild(el("div","muted","<hr><b>⚠️ Importante:</b> os dados ficam só neste navegador. O iOS pode apagar o armazenamento do Safari após dias sem uso ou ao limpar histórico. Para não perder nada: mantenha o backup automático ligado e salve o <code>.json</code> gerado na pasta do seu vault (iCloud).<br>"+sessions.length+" treinos salvos · último backup: <b>"+(cfg.lastBackup||"nunca")+"</b>"));
+  /* Aqui havia um toggle "Backup automático ao finalizar". A v1.2.0 tirou o backup
+     automático e o botão ficou: ligado, ele exibia "✓ Backup automático ao finalizar"
+     num app que não fazia backup nenhum. Confirmação tem que ser verdadeira — removido
+     na v1.3.1 em vez de religado. O backup é o "⬇ Exportar dados" acima, na sua mão. */
+  c3.appendChild(el("div","muted","<hr><b>⚠️ Importante:</b> os dados ficam só neste navegador. O iOS pode apagar o armazenamento do Safari após dias sem uso ou ao limpar histórico. Para não perder nada: toque em <b>⬇ Backup pro vault</b> depois de treinar e salve o <code>.json</code> no <b>iCloud Drive</b> (a raiz serve).<br>"+sessions.length+" treinos salvos · último backup: <b id='cfgLastBk'>"+(cfg.lastBackup||"nunca")+"</b>"));
   const rst=el("button","btn-danger btn-sm","Resetar treinos p/ padrão");rst.style.marginTop="8px";
   rst.onclick=()=>{if(confirm("Restaurar os 4 treinos padrão? (histórico é preservado)")){templates=JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));save(K.tpl,templates);toast("Restaurado");render();}};
   c3.appendChild(rst);
@@ -891,11 +1252,91 @@ function renderCfg(a){
   // análise / Apple Health
   const c4=el("div","card");
   c4.appendChild(el("h3",null,"📊 Análise (desktop / Apple Health)"));
-  c4.appendChild(el("div","muted","JSON canônico com horário de cada série (ISO), pronto pra cruzar com o export do Apple Watch. Salve como <b>treinos.json</b> na pasta <b>54.01 Academia/_dados/</b> do seu vault — o iCloud sincroniza pro Mac e eu leio na consolidação."));
-  const ax=el("button","btn-primary btn-sm","⬇ treinos.json (análise)");ax.style.marginTop="8px";
-  ax.onclick=()=>download("treinos.json",JSON.stringify(analysisExport(),null,2),"application/json");
-  c4.appendChild(ax);
+  /* v1.4.0: o "⬇ treinos.json (análise)" saiu. Ele abria um segundo share sheet pra
+     produzir um arquivo que ninguém consome: o recolher_treino.py classifica o schema
+     `gymlog/*` vindo do celular como "ignorar" e regenera o treinos.json do zero a
+     partir do backup. Um arquivo a menos no share, zero informação perdida.
+     O import do Apple Health não fica neste card — fica na aba 📊 Análise, no desktop —
+     e continua onde estava. */
+  c4.appendChild(el("div","muted","O <b>treinos.json</b> (schema canônico, horário de cada série em ISO) "+
+    "não sai mais do celular: ele é regenerado no Mac pelo <code>recolher_treino.py</code> a partir do "+
+    "<b>⬇ Backup pro vault</b> acima. Um arquivo pra exportar, um lugar pra salvar.<br>"+
+    "O <b>Apple Health</b> se carrega na aba <b>📊 Análise</b>, que aparece no desktop (tela ≥900px)."));
   a.appendChild(c4);
+
+  // ---- diagnóstico de dados ----
+  const cd=el("div","card");
+  cd.appendChild(el("h3",null,"Diagnóstico de dados"));
+  const si=storageInfo();
+  const totSets=sessions.reduce((a,x)=>a+(x.exercises||[]).reduce((b,e)=>b+(e.sets||[]).length,0),0);
+  const last=sessions[sessions.length-1];
+  const corrompidas=Object.keys(si.det).filter(k=>k.indexOf("__corrompido_")>-1);
+  cd.appendChild(el("div","muted",
+    "Histórico: <b>"+sessions.length+"</b> treinos · <b>"+totSets+"</b> séries<br>"+
+    "Ocupação: <b>"+Math.round(si.total/1024)+" KB</b> (treinos: "+Math.round((si.det[K.sess]||0)/1024)+" KB)<br>"+
+    "Último salvo: "+(last?"<b>"+esc(last.date)+"</b> · treino "+esc(last.day)+" · "+
+      (last.exercises||[]).length+" ex · "+(last.exercises||[]).reduce((b,e)=>b+e.sets.length,0)+" séries":"—")));
+  if(corrompidas.length){
+    const al=el("div");al.style.cssText="margin-top:10px;color:var(--danger);font-weight:650";
+    al.textContent="⚠ "+corrompidas.length+" cópia(s) de dado corrompido preservada(s) — não apague antes de auditar";
+    cd.appendChild(al);
+  }
+
+  // últimos salvamentos, com conteúdo real
+  const lw=el("div");lw.style.cssText="display:none;margin-top:10px";
+  sessions.slice(-8).reverse().forEach(x=>{
+    const nSets=(x.exercises||[]).reduce((b,e)=>b+(e.sets||[]).length,0);
+    const r=el("div");r.style.cssText="padding:8px 0;border-top:1px solid var(--border);font-size:13px";
+    r.innerHTML="<div style='font-weight:600;font-variant-numeric:tabular-nums'>"+esc(x.date)+" · "+esc(x.day)+
+      " <span class='muted'>"+ (x.exercises||[]).length +" ex · "+nSets+" séries · "+Math.round(sessVol(x))+" kg·rep</span></div>"+
+      "<div class='muted'>"+esc((x.exercises||[]).map(e=>e.n).join(" · "))+"</div>";
+    lw.appendChild(r);
+  });
+  const lb=el("button","btn-ghost btn-sm","Ver últimos salvamentos");lb.style.marginTop="10px";
+  lb.onclick=()=>{const o=lw.style.display!=="none";lw.style.display=o?"none":"block";
+    lb.textContent=o?"Ver últimos salvamentos":"Ocultar";};
+  cd.appendChild(lb);cd.appendChild(lw);
+
+  // log de gravações — falhas primeiro
+  const logs=ioLogRead(), falhas=logs.filter(ioFail);
+  const gw=el("div");gw.style.cssText="display:none;margin-top:10px;font-size:12px";
+  if(!logs.length)gw.appendChild(el("div","muted","Nenhum registro ainda."));
+  logs.slice().reverse().forEach(r=>{
+    const d=new Date(r.t),hh=String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+    const li=el("div");li.style.cssText="padding:6px 0;border-top:1px solid var(--border)";
+    li.innerHTML="<span style='font-variant-numeric:tabular-nums' class='muted'>"+
+      d.toISOString().slice(0,10)+" "+hh+"</span> <b style='color:"+(ioFail(r)?"var(--danger)":"var(--accent)")+"'>"+
+      esc(r.kind)+"</b> <span class='muted'>"+esc(r.key||"")+"</span><br>"+esc(r.msg||"");
+    gw.appendChild(li);
+  });
+  const gb=el("button","btn-ghost btn-sm","Log de gravações"+(falhas.length?" ("+falhas.length+" falha(s))":""));
+  gb.style.marginTop="8px";
+  if(falhas.length)gb.style.color="var(--danger)";
+  gb.onclick=()=>{const o=gw.style.display!=="none";gw.style.display=o?"none":"block";
+    gb.textContent=o?("Log de gravações"+(falhas.length?" ("+falhas.length+" falha(s))":"")):"Ocultar log";};
+  cd.appendChild(gb);cd.appendChild(gw);
+  a.appendChild(cd);
+
+  // ---- rodapé de versão ----
+  const vf=el("div","card");
+  vf.style.cssText="text-align:center;opacity:.75";
+  const rel=APP_RELEASED.split("-").reverse().join("/");
+  vf.innerHTML="<div style='font-weight:600'>Treino · v"+APP_VERSION+"</div>"+
+               "<div class='muted' style='font-size:13px'>Release "+rel+"</div>";
+  const vlog=el("div");
+  vlog.style.cssText="display:none;text-align:left;margin-top:10px;font-size:13px";
+  vlog.innerHTML=APP_CHANGELOG.map(r=>
+      "<div style='margin-bottom:10px'><b>v"+esc(r.v)+"</b>"+
+      (r.d?" <span class='muted'>· "+r.d.split("-").reverse().join("/")+"</span>":"")+
+      "<ul style='margin:4px 0 0 18px;padding:0'>"+
+      r.c.map(x=>"<li>"+esc(x)+"</li>").join("")+"</ul></div>").join("");
+  const vb=el("button","btn-ghost btn-sm","Histórico de versões");
+  vb.style.marginTop="8px";
+  vb.onclick=()=>{const open=vlog.style.display!=="none";
+    vlog.style.display=open?"none":"block";
+    vb.textContent=open?"Histórico de versões":"Ocultar histórico";};
+  vf.appendChild(vb);vf.appendChild(vlog);
+  a.appendChild(vf);
 }
 
 /* ---------- EXPORT CANÔNICO (schema gymlog/v1) ---------- */
@@ -978,15 +1419,135 @@ function fldInput(lb,val,type,on){const w=el("div");w.appendChild(el("label","fl
   const i=el("input");i.type=type;if(type==="text")i.style.textAlign="left";i.value=val==null?"":val;i.oninput=()=>on(i.value);
   w.appendChild(i);return w;}
 
-function doImport(){const inp=document.createElement("input");inp.type="file";inp.accept=".json,application/json";
-  inp.onchange=()=>{const f=inp.files[0];if(!f)return;const rd=new FileReader();
-    rd.onload=()=>{try{const d=JSON.parse(rd.result);
-      if(d.templates)templates=d.templates;if(d.sessions)sessions=d.sessions;if(d.cfg)cfg=d.cfg;
-      save(K.tpl,templates);save(K.sess,sessions);save(K.cfg,cfg);toast("Importado ✓");render();
-    }catch(e){toast("Arquivo inválido");}};rd.readAsText(f);};inp.click();}
-function exportAllMd(){if(!sessions.length){toast("Sem treinos");return;}
-  const all=sessions.map(sessionMarkdown).join("\n\n---\n\n");
-  download("Treinos ("+today()+").md",all,"text/markdown");}
+/* Antes: substituía templates/sessions/cfg sem conferir nada. Um arquivo errado
+   apagava o histórico em silêncio. Agora valida, mostra o que vai mudar e confirma. */
+function inspectBackup(d){
+  const erros=[],resumo={};
+  if(!d||typeof d!=="object")return{erros:["arquivo não é um objeto JSON"],resumo:resumo};
+  if(!d.sessions&&!d.templates)erros.push("não tem 'sessions' nem 'templates' — não parece um backup do Treino");
+  if(d.sessions!=null){
+    if(!Array.isArray(d.sessions))erros.push("'sessions' não é uma lista");
+    else{
+      let sets=0,ruins=0;
+      d.sessions.forEach(x=>{
+        const v=validateSession(x);
+        if(v.erros.length)ruins++;
+        sets+=v.stats.sets||0;
+      });
+      const ds=d.sessions.map(x=>x&&x.date).filter(Boolean).sort();
+      resumo.sessions=d.sessions.length;resumo.sets=sets;resumo.ruins=ruins;
+      resumo.de=ds[0];resumo.ate=ds[ds.length-1];
+      if(!d.sessions.length)erros.push("a lista de treinos está vazia");
+    }
+  }
+  if(d.templates!=null){
+    if(typeof d.templates!=="object"||Array.isArray(d.templates))erros.push("'templates' não é um objeto");
+    else{
+      const ks=Object.keys(d.templates);
+      const ruins=ks.filter(k=>!d.templates[k]||!Array.isArray(d.templates[k].ex));
+      if(ruins.length)erros.push("templates sem lista 'ex': "+ruins.join(", "));
+      resumo.templates=ks.length;
+      resumo.exercicios=ks.reduce((a,k)=>a+((d.templates[k]&&d.templates[k].ex)||[]).length,0);
+    }
+  }
+  return{erros:erros,resumo:resumo};
+}
+function doImport(){
+  const inp=document.createElement("input");inp.type="file";inp.accept=".json,application/json";
+  inp.onchange=()=>{
+    const f=inp.files[0];if(!f)return;
+    const rd=new FileReader();
+    rd.onload=()=>{
+      let d;
+      try{ d=JSON.parse(rd.result); }
+      catch(e){ logIO("import-parse-fail",f.name,e.message,String(rd.result||"").length);
+        toast("Arquivo inválido — não é JSON"); return; }
+      const chk=inspectBackup(d);
+      if(chk.erros.length){
+        logIO("import-invalid",f.name,chk.erros.join(" | "));
+        alert("Não importei — o arquivo tem problemas:\n\n• "+chk.erros.join("\n• "));
+        return;
+      }
+      const r=chk.resumo;
+      const linhas=["Arquivo: "+f.name,""];
+      if(r.sessions!=null){
+        linhas.push("Treinos no arquivo: "+r.sessions+" ("+r.sets+" séries)");
+        linhas.push("Período: "+(r.de||"?")+" → "+(r.ate||"?"));
+        linhas.push("Você tem agora: "+sessions.length+" treinos");
+        const dif=r.sessions-sessions.length;
+        if(dif<0)linhas.push("⚠ ATENÇÃO: vai FICAR COM "+Math.abs(dif)+" TREINO(S) A MENOS");
+        if(r.ruins)linhas.push("⚠ "+r.ruins+" treino(s) do arquivo estão incompletos");
+      }
+      if(r.templates!=null)linhas.push("Templates: "+r.templates+" ("+r.exercicios+" exercícios)");
+      linhas.push("","Substituir os dados deste aparelho?");
+      if(!confirm(linhas.join("\n")))return;
+
+      if(d.templates)templates=d.templates;
+      if(d.sessions)sessions=d.sessions;
+      if(d.cfg)cfg=d.cfg;
+      const ok=[["templates",save(K.tpl,templates)],["sessions",save(K.sess,sessions)],["cfg",save(K.cfg,cfg)]]
+        .filter(x=>!x[1]).map(x=>x[0]);
+      if(ok.length){
+        logIO("import-write-fail",f.name,"falhou ao gravar: "+ok.join(", "));
+        alert("Importado só em parte — falhou ao gravar: "+ok.join(", ")+
+              "\nVeja Ajustes → Diagnóstico de dados.");
+      }else{
+        logIO("ok","import",f.name+" · "+(r.sessions||0)+" treinos · "+(r.sets||0)+" séries");
+        toast("Importado ✓ "+(r.sessions||0)+" treinos");
+      }
+      render();
+    };
+    rd.onerror=()=>{logIO("import-read-fail",f.name,"FileReader falhou");toast("Não consegui ler o arquivo");};
+    rd.readAsText(f);
+  };
+  inp.click();
+}
+/* v1.4.0: exportAllMd() saiu com o botão "⬇ Todos os .md". Era o terceiro share de um
+   toque só e o .md do celular nunca foi lido por nada. O markdown de uma sessão
+   continua em showMarkdown(), como cópia pra área de transferência. */
+
+/* ============ VERSÃO ============ */
+const APP_VERSION="1.4.0";
+const APP_RELEASED="2026-08-31";
+/* Versionamento semântico MAJOR.MINOR.PATCH
+   MAJOR = muda o formato dos dados (backup/restore incompatível)
+   MINOR = funcionalidade nova, dados compatíveis
+   PATCH = correção sem mudar comportamento                        */
+const APP_CHANGELOG=[
+ {v:"1.4.0",d:"2026-08-31",c:[
+   "Um botão só: ⬇ Backup pro vault, mesmo rótulo na tela de fim de treino e em Ajustes",
+   "Um toque exporta um arquivo — saíram o treinos.json (regenerado no Mac) e o Todos os .md",
+   "O card se reescreve depois do share com o que saiu: N treinos · M séries · período · KB · arquivo",
+   "Cancelar e falhar são estados nomeados na tela, e o botão continua ali nos dois",
+   "Segundo toque durante o compartilhamento é recusado — não exporta duplicado",
+   "Sem treino no histórico o botão fica desabilitado dizendo que não há o que exportar",
+   "📋 Markdown virou só cópia pra área de transferência, sem share sheet",
+   "O descanso sobrevive a reload e a troca de aba: o carimbo vive em active.restTimer"]},
+ {v:"1.3.2",d:"2026-08-31",c:[
+   "A tela de fim de treino parou de afirmar que arquivo de ~30 bytes é falha do iOS — nunca foi",
+   "Deixou de mandar salvar em iCloud Drive → Treino: a raiz serve, a consolidação varre as duas",
+   "No lugar do mito, o que o backup leva de fato: N treinos · M séries · nome do arquivo"]},
+ {v:"1.3.1",d:"2026-08-18",c:[
+   "Exportar no iPhone gera um arquivo, não dois — o `title` do share virava um `text N.txt` solto",
+   "Removido o toggle de backup automático: não fazia backup desde a v1.2.0",
+   "Ajustes não promete mais backup que não acontece"]},
+ {v:"1.3.0",d:"2026-07-30",c:[
+   "Exercício ativo agora é o do último set logado, não a posição na lista",
+   "Fluxo não-linear: voltar num exercício anterior ou fazer superset move o ativo corretamente",
+   "Mesmo carimbo de horário alimenta o ativo e a reordenação por última execução"]},
+ {v:"1.2.0",d:"2026-07-30",c:[
+   "Salvamento validado: recusa sessão vazia ou incompleta em vez de gravar calado",
+   "Tela de confirmação mostra o conteúdo real salvo e confere por releitura",
+   "Ajustes → Diagnóstico de dados: últimos salvamentos, ocupação e log de gravações",
+   "JSON corrompido não some mais em silêncio — cópia bruta é preservada",
+   "Importação valida o arquivo e avisa antes de substituir o histórico"]},
+ {v:"1.1.0",d:"2026-07-29",c:[
+   "Exercícios ordenados pela ordem real de execução da última sessão",
+   "Versão e data de release visíveis em Ajustes",
+   "Base consolidada com o histórico do Obsidian (72 sessões · 1290 séries)"]},
+ {v:"1.0.0",d:null,c:[
+   "Versão inicial: registro de séries, RIR, descanso, histórico e análise"]}
+];
 
 /* ============ BOOT ============ */
 requestPersist();applyTheme();
