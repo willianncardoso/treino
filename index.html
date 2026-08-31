@@ -166,17 +166,24 @@ const IO_NAO_FALHA={ok:1,backup:1,"backup-cancel":1};
 function ioFail(r){return !IO_NAO_FALHA[r&&r.kind];}
 function ioLogRead(){try{const r=localStorage.getItem(K.iolog);return r?JSON.parse(r):[];}catch(e){return [];}}
 
+/* Chave -> motivo, quando a leitura falhou e a tela recebeu o default no lugar do dado.
+   O iolog já registrava; isto é o que permite a TELA dizer que não veio, em vez de
+   desenhar um zero em cima de uma leitura que falhou. Vazio de verdade não entra aqui. */
+const loadFail={};
+function readFailed(k){return loadFail[k]||null;}
+
 /* Antes: qualquer erro devolvia o default silenciosamente — um JSON corrompido
    virava [] e o save seguinte apagava o histórico. Agora preserva o bruto e registra. */
 const load=(k,d)=>{
   let raw;
   try{ raw=localStorage.getItem(k); }
-  catch(e){ logIO("read-fail",k,e.message); return d; }
-  if(raw==null||raw==="") return d;
-  try{ return JSON.parse(raw); }
+  catch(e){ logIO("read-fail",k,e.message); loadFail[k]="o navegador recusou a leitura"; return d; }
+  if(raw==null||raw===""){ delete loadFail[k]; return d; }
+  try{ const v=JSON.parse(raw); delete loadFail[k]; return v; }
   catch(e){
     try{ localStorage.setItem(k+"__corrompido_"+Date.now(),raw); }catch(_){}
     logIO("parse-fail",k,e.message+" — cópia bruta preservada",raw.length);
+    loadFail[k]="o JSON gravado está corrompido (cópia bruta preservada)";
     return d;
   }
 };
@@ -189,6 +196,7 @@ const save=(k,v)=>{
   catch(e){ logIO("write-fail",k,e.message,str.length); return false; }
   try{ if(localStorage.getItem(k)!==str){ logIO("verify-fail",k,"releitura difere do gravado",str.length); return false; } }
   catch(e){ logIO("verify-fail",k,e.message); return false; }
+  delete loadFail[k];   // gravou e releu igual: a chave voltou a ser confiável (import, restore)
   return true;
 };
 
@@ -322,6 +330,7 @@ function openExDemo(name){window.open("https://www.google.com/search?tbm=isch&q=
 
 /* ============ CRONÔMETRO DE DESCANSO (conta pra cima, grava a pausa real) ============ */
 let swId=null, swStart=0, swTarget=0, swExIdx=-1, swBeeped=false;
+const REST_MAX_RESUME_MS=2*60*60*1000;   // carimbo mais velho que isto não é pausa, é aba esquecida
 /* `resumeTs` = retomada (reload ou volta de outra aba). O swStart já era timestamp
    absoluto, então app em background nunca distorceu a contagem — o buraco era que ele
    vivia só em memória: persistActive() salvava `active` sem ele e o reload zerava a
@@ -362,14 +371,63 @@ function resumeRest(){
   if(swId)return;                                        // já contando
   const r=active&&active.restTimer;
   if(!r||!active.exercises[r.i])return;
+  /* Retomar um cronômetro de 6 horas seria afirmar uma pausa que não existiu: a aba ficou
+     aberta, ele não descansou. Descarta o carimbo e volta pra sessionbar em repouso. */
+  if(Date.now()-r.s>REST_MAX_RESUME_MS){delete active.restTimer;persistActive();return;}
   startRest(r.i,r.s);
 }
-function beep(){try{const c=new(window.AudioContext||window.webkitAudioContext)();const o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;g.gain.value=.1;o.start();setTimeout(()=>{o.stop();c.close();},400);}catch(e){}
-  if(navigator.vibrate)navigator.vibrate([200,80,200]);}
+/* ============ ALARME DE FIM DE DESCANSO (P5.1) ============ */
+/* Isto nunca tocou no iPhone. O beep antigo criava o AudioContext DENTRO da função, que é
+   chamada do tick do cronômetro — no iOS um contexto criado fora de gesto do usuário nasce
+   `suspended` e não emite som. E o `catch(e){}` vazio engolia a evidência: 81 sessões de
+   descanso terminando em silêncio sem nenhum rastro. O `navigator.vibrate` que vinha junto
+   não é implementado pelo Safari do iOS — era código que parecia fazer algo e saiu.
+   Agora o contexto é criado e retomado no gesto que já existe e está no lugar certo: o
+   toque em ▶ Descanso, que é o que inicia a contagem. E o estado é dito na tela, porque
+   alarme que falha calado é exatamente o que não pode voltar. */
+let audioCtx=null, audioMsg="ainda não testado";
+function audioEstado(){return audioMsg;}
+/* SÓ chamar de dentro de um gesto do usuário — fora dele o iOS ignora e o estado fica
+   `suspended`, que é o bug que este item conserta. */
+function armAudio(cb){
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC){audioMsg="este navegador não tem Web Audio";logIO("audio-fail","beep",audioMsg);if(cb)cb(false);return;}
+  try{ if(!audioCtx)audioCtx=new AC(); }
+  catch(e){audioMsg="o navegador recusou criar o áudio: "+e.message;logIO("audio-fail","beep",e.message);if(cb)cb(false);return;}
+  try{ // buffer mudo tocado dentro do gesto: é o que destrava o áudio no iOS
+    const s=audioCtx.createBufferSource();s.buffer=audioCtx.createBuffer(1,1,22050);
+    s.connect(audioCtx.destination);s.start(0);
+  }catch(e){}
+  const fim=()=>{const ok=audioCtx.state==="running";
+    audioMsg=ok?"liberado":"o navegador manteve o áudio suspenso ("+audioCtx.state+")";
+    if(!ok)logIO("audio-fail","beep",audioMsg);
+    if(cb)cb(ok);};
+  if(audioCtx.state==="suspended"){try{audioCtx.resume().then(fim,fim);}catch(e){fim();}}
+  else fim();
+}
+function beep(){
+  if(!audioCtx||audioCtx.state!=="running"){
+    audioMsg="não tocou — o áudio não estava liberado ("+(audioCtx?audioCtx.state:"nenhum contexto criado")+")";
+    logIO("beep-fail","descanso",audioMsg);   // vira linha vermelha em Ajustes → Diagnóstico
+    return false;
+  }
+  try{
+    const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+    o.connect(g);g.connect(audioCtx.destination);
+    o.frequency.value=880;g.gain.value=.12;
+    o.start();setTimeout(()=>{try{o.stop();o.disconnect();g.disconnect();}catch(e){}},450);
+    audioMsg="tocou às "+new Date().toTimeString().slice(0,8);
+    return true;
+  }catch(e){audioMsg="falhou ao tocar: "+e.message;logIO("beep-fail","descanso",e.message);return false;}
+}
 
 /* ============ NAV ============ */
 function isDesktop(){return window.matchMedia("(min-width: 900px)").matches;}
-function go(t){tab=t;bkState={phase:"idle"};render();window.scrollTo(0,0);}  // relatório de export é do toque, não do dia
+function go(t){tab=t;bkState={phase:"idle"};addExOpen=false;render();window.scrollTo(0,0);}  // relatório de export é do toque, não do dia
+/* P4.7: ligado só na retomada de sessão (reload e "Continuar treino →"), consumido pela
+   renderLog. Nunca a cada série — a lista não pode se mexer no meio do toque. */
+let wantScrollActive=false;
+let addExOpen=false;    // P4.8: painel de adicionar exercício aberto
 function renderTabs(){
   const tabs=[["home","🏠","Treinar"],["hist","📈","Histórico"]];
   if(isDesktop())tabs.push(["analise","📊","Análise"]);
@@ -401,17 +459,48 @@ function renderHome(a){
     const c=el("div","card");
     c.style.borderColor="var(--accent)";
     c.innerHTML="<div class='muted'>Sessão em andamento</div><h2 style='margin:4px 0'>Treino "+active.day+" — "+esc(templates[active.day].name)+"</h2>";
-    const b=el("button","btn-primary","Continuar treino →");b.style.width="100%";b.onclick=()=>go("log");
+    const b=el("button","btn-primary","Continuar treino →");b.style.width="100%";
+    b.onclick=()=>{wantScrollActive=true;go("log");};
     c.appendChild(b);a.appendChild(c);
   }
+  a.appendChild(weekBox());
+
   a.appendChild(el("h3",null,"Escolher treino"));
+  const falhou=readFailed(K.sess);
+  if(falhou)a.appendChild(el("div","muted","histórico não pôde ser lido — a ordem abaixo é a do template · ver Ajustes → Diagnóstico de dados"));
   const g=el("div","daygrid");
-  Object.keys(templates).forEach(d=>{
+  /* P4.10 — a ordem A,B,C,D era o calendário do plano, que não existe mais: não há
+     getDay() em lugar nenhum do arquivo. Ordenada por dias sem treinar, a posição passa a
+     significar "o que você deve", que é um invariante melhor que "a letra A vem primeiro".
+     Reordenar aqui é seguro e no P4.7 não é: aqui a ordem só muda ENTRE visitas, depois de
+     um treino terminar — nunca embaixo do polegar no meio de uma série. */
+  const diasDe=d=>{const l=lastSessionFor(d);return l?daysSince(l.date):null;};
+  const letras=Object.keys(templates);
+  const ordem=falhou?letras:letras.slice().sort((x,y)=>{
+    const a1=diasDe(x),b1=diasDe(y);
+    if(a1===null&&b1===null)return x<y?-1:1;
+    if(a1===null)return -1;               // nunca treinado vai pro topo…
+    if(b1===null)return 1;
+    if(a1!==b1)return b1-a1;              // …e o resto, mais dias sem treinar primeiro
+    return x<y?-1:1;                      // empate de data: desempata pela letra
+  });
+  ordem.forEach(d=>{
     const t=templates[d];const card=el("button","daycard");
-    const last=lastSessionFor(d);
+    /* O card imprimia `último: 2026-08-07`. Pra saber que são 24 dias ele tinha que fazer
+       conta de data de cabeça, em pé, na porta da academia. Ninguém faz. E o "nunca
+       treinado" é textual e SEM cor de aviso: vai pro topo por palpite, mas ausência não
+       se disfarça de "há muitos dias", que é um fato que o dado não sustenta. */
+    let sel;
+    if(falhou)sel="<div class='muted' style='margin-top:4px'>histórico não lido</div>";
+    else{
+      const n=diasDe(d);
+      const txt=n===null?"nunca treinado":n===0?"hoje":n===1?"ontem":"há "+n+" dias";
+      const alerta=n!==null&&n>DIAS_ALERTA;   // 4 letras ÷ 3 sessões/semana = ciclo de 9,3 dias
+      sel="<div class='muted' style='margin-top:4px'>"+
+          (alerta?"<b style='color:var(--warn)'>"+txt+"</b>":txt)+"</div>";
+    }
     card.innerHTML="<div class='big'>"+d+"</div><div style='font-weight:600;margin:2px 0'>"+esc(t.name)+"</div>"+
-      "<div class='muted'>"+t.ex.length+" exercícios</div>"+
-      (last?"<div class='muted' style='margin-top:4px'>último: "+last.date+"</div>":"<div class='muted' style='margin-top:4px'>—</div>");
+      "<div class='muted'>"+t.ex.length+" exercícios</div>"+sel;
     card.onclick=()=>startSession(d);
     g.appendChild(card);
   });
@@ -430,6 +519,46 @@ function renderHome(a){
   }
 }
 function lastSessionFor(d){const f=sessions.filter(s=>s.day===d);return f.length?f[f.length-1]:null;}
+
+/* ---------- HOME: as duas perguntas (P4.1 e P4.10) ---------- */
+/* 10 dias não é número inventado: 4 letras ÷ 3 sessões/semana (a meta que a R6 baixou) dá
+   um ciclo de 9,3 dias. Passar disso significa ter pulado um ciclo inteiro daquela letra.
+   Colore o número, não um selo de "atrasado" — é fato, não punição. */
+const DIAS_ALERTA=10;
+const WEEK_GOAL_DEFAULT=3;
+/* Sai do cfg, não do código: o 216 min/mês do cardio virou meta fóssil porque estava
+   hardcoded, e a R6 já baixou esta de 4 pra 3. Campo em Ajustes resolve sem release. */
+function weekGoal(){const n=parseInt(cfg.weekGoal,10);return (n>0&&n<=14)?n:WEEK_GOAL_DEFAULT;}
+// dias inteiros entre uma data AAAA-MM-DD e hoje, hora local (sem UTC no meio)
+function daysSince(s){const p=String(s).split("-");
+  const a=new Date(+p[0],+p[1]-1,+p[2]),h=new Date();
+  return Math.floor((new Date(h.getFullYear(),h.getMonth(),h.getDate())-a)/864e5);}
+// segunda a domingo da semana corrente, hora local
+function weekRange(){const h=new Date();const x=new Date(h.getFullYear(),h.getMonth(),h.getDate());
+  const seg=new Date(x);seg.setDate(x.getDate()-((x.getDay()+6)%7));
+  const dom=new Date(seg);dom.setDate(seg.getDate()+6);
+  const f=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+  return [f(seg),f(dom)];}
+/* A palavra é "registrados", não "treinos": em agosto foram 11 treinos e 9 registros no app.
+   Num app cuja tese é aderência, um contador que erra pra baixo puniria justamente os dias
+   em que ele treinou e não anotou — a direção mais cara. O número descreve o registro.
+   Dos cinco estados, aqui só existem três: a leitura é síncrona do localStorage (não há
+   "carregando") e um contador de uma linha não tem "parcial". Zero é zero e aparece. */
+function weekBox(){
+  const b=el("div","lastbox");
+  const falhou=readFailed(K.sess);
+  let hl,sub;
+  if(falhou){ hl="histórico não pôde ser lido"; sub="ver Ajustes → Diagnóstico de dados · "+falhou; }
+  else{
+    const [ini,fim]=weekRange();
+    const n=sessions.filter(s=>s.date>=ini&&s.date<=fim).length;
+    hl=n+(n===1?" registrado":" registrados")+" · meta "+weekGoal();
+    sub="conta treinos registrados neste app";
+  }
+  b.innerHTML="<div class='lbl'>ESTA SEMANA (SEG–DOM)</div><div class='hl'>"+hl+"</div>"+
+              "<div class='muted' style='font-size:12px;margin-top:2px'>"+esc(sub)+"</div>";
+  return b;
+}
 function sessVol(s){return s.exercises.reduce((a,e)=>a+setVol(e.sets),0);}
 
 /* ---------- START / LOG ---------- */
@@ -495,13 +624,29 @@ function renderLog(a){
   let activeIdx=active.ultimoExercicioId
     ? active.exercises.findIndex(e=>e.id===active.ultimoExercicioId) : -1;
   if(activeIdx<0)activeIdx=active.exercises.findIndex(e=>!e.done);
-  order.forEach(i=>a.appendChild(exCard(active.exercises[i],i,i===activeIdx)));
+  const nodes={};
+  order.forEach(i=>{const n=exCard(active.exercises[i],i,i===activeIdx);nodes[i]=n;a.appendChild(n);});
+
+  /* P4.7 — a lista NÃO reordena durante o treino: mexer debaixo do polegar troca meio
+     scroll por um toque no exercício errado. Medido no navegador: o render() a cada série
+     preserva a rolagem (nada força layout entre o innerHTML="" e os appendChild), então
+     não há posição a consertar ali. O que perde o lugar é a retomada — go("log") faz
+     scrollTo(0,0) e o reload nasce no topo. Só nesses dois casos a tela vai até o
+     exercício do momento. Isto é rolagem, não uma quarta regra de ordenação. */
+  if(wantScrollActive){
+    wantScrollActive=false;
+    let alvo=(activeIdx>=0&&!active.exercises[activeIdx].done)?activeIdx
+            :active.exercises.findIndex(e=>!e.done);
+    const card=nodes[alvo];
+    /* Sem `behavior:"smooth"` de propósito: medido no navegador, o scroll suave é
+       descartado quando o documento está `hidden` — que é exatamente o caso de uma aba
+       restaurada. Instantâneo sempre acontece, e numa retomada não há nada pra animar. */
+    if(card&&order.indexOf(alvo)>0)setTimeout(()=>card.scrollIntoView({block:"center"}),60);
+  }
 
   const addBtn=el("button","btn-ghost","+ Adicionar exercício");addBtn.style.width="100%";addBtn.style.marginBottom="12px";
-  addBtn.onclick=()=>{const n=prompt("Nome do exercício:");if(!n)return;
-    active.exercises.push({n,sr:"3×10",rest:60,mvw:false,notes:"",sets:[]});
-    ensureIds(active);persistActive();render();};
-  a.appendChild(addBtn);
+  addBtn.onclick=()=>{addExOpen=true;render();};
+  a.appendChild(addExOpen?addExPanel():addBtn);
 
   const fin=el("button","btn-primary","✓ Finalizar treino");fin.style.width="100%";fin.onclick=finishSession;
   a.appendChild(fin);
@@ -510,6 +655,102 @@ function renderLog(a){
     {active=null;localStorage.removeItem(K.active);go("home");}};
   a.appendChild(disc);
   a.appendChild(el("div",null,"<div style='height:110px'></div>"));
+}
+
+/* ============ ADICIONAR EXERCÍCIO (P4.8) ============ */
+/* Não é caminho de exceção: 43 das 81 sessões (53%) têm ao menos um exercício fora do
+   template. Adicionar no meio do treino é o comportamento normal, não o acidente — e até
+   aqui a única porta era um prompt() de texto livre, o pior controle possível pra uma mão
+   suada em pé. Ele já partiu 3 séries históricas em duas chaves cada.
+   (o `let addExOpen` mora lá em cima, junto do wantScrollActive: o go() o zera.) */
+
+/* Compara nomes ignorando caixa, acento e pontuação. NUNCA é o que se grava: serve só pra
+   reconhecer que "OVERHEAD BANCO", "Overhead banco" e "Abdomen - máquina" apontam pro
+   mesmo exercício que já está no histórico. */
+function normNome(s){return String(s||"").trim().toLowerCase()
+  .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+  .replace(/[^a-z0-9]+/g," ").trim();}
+
+/* Fonte da lista: nomes distintos das sessões ∪ nomes dos templates — as duas já no
+   localStorage, zero dependência nova. As notas do vault ficam de fora: o app não as
+   enxerga, e criar esse import é inventar uma dependência que ninguém vai manter.
+   `cont` é nº de SESSÕES em que o nome aparece, não nº de séries. */
+function exNameOptions(){
+  const falhou=readFailed(K.sess);
+  const cont={};
+  if(!falhou)sessions.forEach(s=>{
+    const vistos={};
+    (s.exercises||[]).forEach(e=>{const n=(e.n||"").trim();
+      if(!n||vistos[n])return;vistos[n]=1;cont[n]=(cont[n]||0)+1;});
+  });
+  Object.keys(templates).forEach(d=>(templates[d].ex||[]).forEach(e=>{
+    const n=(e.n||"").trim();if(n&&cont[n]==null)cont[n]=0;}));
+  const lista=Object.keys(cont).sort((a,b)=>(cont[b]-cont[a])||(a<b?-1:1));
+  return {lista:lista,cont:cont,falhou:falhou};
+}
+
+/* Camada 2 — se o que ele digitou normaliza igual a um nome que já existe, grava o nome que
+   já existe. Silencioso é aceitável AQUI e só aqui, porque o resultado é o dado ficar mais
+   junto, nunca mais separado. Ainda assim a tela diz qual nome foi usado: escolher por ele
+   é uma coisa, não contar é outra. */
+function addExercicio(nome){
+  const n=String(nome||"").trim();
+  if(!n)return;
+  const canonico=exNameOptions().lista.find(x=>normNome(x)===normNome(n))||n;
+  active.exercises.push({n:canonico,sr:"3×10",rest:60,mvw:false,notes:"",sets:[]});
+  ensureIds(active);addExOpen=false;persistActive();render();
+  if(canonico!==n)toast('Usei "'+canonico+'" — já está no histórico');
+}
+
+/* A lista não é campo de busca: os 9 nomes mais frequentes cobrem 59 dos 74 usos fora do
+   template, então ordenada por uso a resposta está nas primeiras linhas e ele não digita
+   nada. O filtro existe, mas NÃO recebe foco — abrir teclado por padrão anula o ganho. */
+function addExPanel(){
+  const o=exNameOptions();
+  const c=el("div","card");
+  const head=el("div","row");
+  head.innerHTML="<div style='flex:1'><h3 style='margin:0'>Adicionar exercício</h3></div>";
+  const fechar=el("button","btn-ghost btn-sm","Cancelar");
+  fechar.onclick=()=>{addExOpen=false;render();};
+  head.appendChild(fechar);c.appendChild(head);
+
+  c.appendChild(el("div","muted",o.falhou
+    ? "histórico não pôde ser lido — mostrando só o template"
+    : (o.lista.length ? "Ordenados por nº de sessões. Toque num nome, ou crie outro no fim."
+                      : "Sem histórico e sem template — só dá pra criar um nome novo.")));
+
+  const filtro=el("input");filtro.type="text";filtro.placeholder="filtrar (opcional)";
+  filtro.style.cssText="margin:9px 0;text-align:left";
+  c.appendChild(filtro);
+
+  const box=el("div");c.appendChild(box);
+  const linhas=o.lista.map(n=>{
+    const r=el("div","sess");r.style.cursor="pointer";
+    r.innerHTML="<div style='flex:1'><div style='font-weight:600'>"+esc(n)+"</div>"+
+      "<div class='muted'>"+(o.cont[n]?o.cont[n]+(o.cont[n]===1?" sessão":" sessões"):"só no template")+"</div></div>";
+    r.onclick=()=>addExercicio(n);
+    box.appendChild(r);
+    return {n:normNome(n),el:r};
+  });
+  const semMatch=el("div","muted","nenhum nome bate com o filtro — dá pra criar abaixo");
+  semMatch.style.display="none";semMatch.style.padding="13px 0";box.appendChild(semMatch);
+
+  /* Criar novo continua possível e não fica escondido: última linha, sempre visível. */
+  const novo=el("button","btn-ghost","+ criar novo…");
+  novo.style.width="100%";novo.style.marginTop="9px";
+  novo.onclick=()=>{const t=filtro.value.trim();
+    if(t)return addExercicio(t);
+    addExercicio(prompt("Nome do exercício:"));};
+  c.appendChild(novo);
+
+  filtro.oninput=()=>{
+    const q=normNome(filtro.value);let vis=0;
+    linhas.forEach(l=>{const ok=!q||l.n.indexOf(q)>=0;l.el.style.display=ok?"":"none";if(ok)vis++;});
+    semMatch.style.display=(vis||!q)?"none":"";
+    const t=filtro.value.trim();
+    novo.textContent=t?'+ criar "'+t+'"':"+ criar novo…";
+  };
+  return c;
 }
 
 function exerciseHistory(name){
@@ -532,17 +773,27 @@ function trendChip(H){if(H.length<2)return"";const d=Math.round((H[0].top-H[1].t
   return"<span class='trend eq'>= manteve</span>";}
 
 function exCard(e,ei,isActive){
+  /* P1.7 — "feito" só é verdade se sobrou série. O mesmo filtro do finishSession
+     (série sem reps é descartada, exercício sem série não entra no histórico), então
+     um exercício marcado sem nenhuma série vira `↷ pulado` nas duas telas. Pulado não
+     é feito, e a interface era o único lugar que dizia o contrário. */
+  const doneSets=e.sets.filter(s=>s.r!==""&&s.r!=null);
+  const pulado=!doneSets.length;
   // estado concluído e recolhido
   if(e.done&&!e.open){
     const d=el("div","exdone");
-    const doneSets=e.sets.filter(s=>s.r!==""&&s.r!=null);
-    d.innerHTML="<span class='ck'>✓</span><span class='nm'>"+esc(e.n)+"</span><span class='sm'>"+summarizeSets(doneSets)+"</span>";
+    if(pulado)d.style.borderLeftColor="var(--muted)";
+    d.innerHTML="<span class='ck'"+(pulado?" style='color:var(--muted)'":"")+">"+(pulado?"↷":"✓")+"</span>"+
+      "<span class='nm'>"+esc(e.n)+"</span>"+
+      "<span class='sm'>"+(pulado?"pulado":summarizeSets(doneSets))+"</span>";
     d.onclick=()=>{e.open=true;persistActive();render();};
     return d;
   }
   const c=el("div","ex"+(isActive?" active":""));
   const head=el("div","ex-head");
-  head.innerHTML="<div><span class='ex-title'>"+esc(e.n)+"</span>"+(e.mvw?"<span class='tag mvw'>🔑 MVW</span>":"")+(e.done?"<span class='tag' style='background:rgba(34,197,94,.15);color:var(--accent)'>✓ feito</span>":"")+
+  head.innerHTML="<div><span class='ex-title'>"+esc(e.n)+"</span>"+(e.mvw?"<span class='tag mvw'>🔑 MVW</span>":"")+
+    (e.done?(pulado?"<span class='tag' style='background:rgba(148,163,184,.15);color:var(--muted)'>↷ pulado</span>"
+                   :"<span class='tag' style='background:rgba(34,197,94,.15);color:var(--accent)'>✓ feito</span>"):"")+
     "<div class='muted'>alvo "+esc(e.sr)+" · desc "+e.rest+"s</div></div>";
   const doneBtn=el("button","btn-ghost btn-sm",e.done?"▴":"✓");doneBtn.title=e.done?"Recolher":"Marcar como feito";doneBtn.style.flex="0 0 auto";
   doneBtn.onclick=()=>{e.done=true;e.open=false;persistActive();render();};
@@ -597,7 +848,9 @@ function exCard(e,ei,isActive){
   const reached=targetSets(e)&&completedSets(e)>=targetSets(e);
   const add=el("button","btn-ghost btn-sm",reached?"+ Série extra":"+ Série");
   add.onclick=()=>{const last=e.sets[e.sets.length-1]||{};e.sets.push({w:last.w||"",r:last.r||"",rir:last.rir||""});e.done=false;persistActive();render();};
-  const rest=el("button","btn-blue btn-sm","▶ Descanso");rest.onclick=()=>startRest(ei);
+  /* P5.1 — este toque é o gesto do usuário que o iOS exige pra liberar o áudio, e é o
+     mesmo toque que inicia a contagem. Sem isto o alarme do fim do descanso não toca. */
+  const rest=el("button","btn-blue btn-sm","▶ Descanso");rest.onclick=()=>{armAudio();startRest(ei);};
   bar.appendChild(add);bar.appendChild(rest);
   const vol=el("div","muted");vol.style.marginLeft="auto";vol.dataset.vol="1";vol.textContent=Math.round(setVol(e.sets))+" kg·rep";
   bar.appendChild(vol);
@@ -1021,8 +1274,16 @@ function renderAnalise(a){
       +kpi("VO2 Max",r1(latestVal(H.daily.VO2Max||{})&&latestVal(H.daily.VO2Max).v),"")
       +kpi("FC rep (30d)",r1(avgWin(H.daily.RestingHeartRate_bpm,30))+" bpm","")
       +kpi("HRV (30d)",r1(avgWin(H.daily.HRV_SDNN_ms,30))+" ms","");
-    if(H.daily.StepCount)html+=kpi("Passos (méd 30d)",Math.round(avgWin(H.daily.StepCount,30)||0).toLocaleString("pt-BR"),"por dia");
-    if(H.daily.AppleExerciseTime)html+=kpi("Exercício (méd 30d)",r1(avgWin(H.daily.AppleExerciseTime,30))+" min","por dia");}
+    /* v1.4.2 — as chaves eram `StepCount`/`AppleExerciseTime`, identificadores crus do
+       HealthKit. O schema apple_health/v2 entrega `Steps`/`ExerciseMinutes`, então a guarda
+       era sempre falsa e estes dois KPIs nunca apareceram. E a guarda deixou de esconder:
+       chave que não veio diz que não veio, com o nome dela. */
+    html+=H.daily.Steps
+      ? kpi("Passos (méd 30d)",Math.round(avgWin(H.daily.Steps,30)||0).toLocaleString("pt-BR"),"por dia")
+      : kpi("Passos (méd 30d)","—","<b>Steps</b> não veio neste export");
+    html+=H.daily.ExerciseMinutes
+      ? kpi("Exercício (méd 30d)",r1(avgWin(H.daily.ExerciseMinutes,30))+" min","por dia")
+      : kpi("Exercício (méd 30d)","—","<b>ExerciseMinutes</b> não veio neste export");}
   // PRs recentes (último período) — do treino
   {const prm={};sess.forEach(s=>s.exercises.forEach(e=>{if(e.top>((prm[e.name]||{}).top||0))prm[e.name]={top:e.top,date:s.date};}));
    const lastDate=sess.length?sess[sess.length-1].date:null;
@@ -1059,6 +1320,15 @@ function renderAnalise(a){
   const chartCard=(title,id,sub)=>{const c=el("div","card");c.style.margin="0";
     c.innerHTML="<h3 style='margin:0 0 2px'>"+title+"</h3>"+(sub?"<div class='muted' style='font-size:12px;margin-bottom:8px'>"+sub+"</div>":"<div style='height:8px'></div>");
     const wrap=el("div");wrap.style.cssText="position:relative;height:280px";const cv=el("canvas");cv.id=id;wrap.appendChild(cv);c.appendChild(wrap);return c;};
+  /* v1.4.2 — card no lugar do gráfico quando a série não veio no export. Antes a guarda
+     `if(H.daily.X)` simplesmente não criava o card: ausência indistinguível de "não havia
+     o que mostrar". Aqui a tela diz o que faltou, com o nome da chave. */
+  const chartAusente=(title,key)=>{const c=el("div","card");c.style.margin="0";
+    c.innerHTML="<h3 style='margin:0 0 2px'>"+title+"</h3>"+
+      "<div class='empty' style='height:280px;display:flex;flex-direction:column;justify-content:center;padding:0'>"+
+      "<div class='ic'>📭</div><div>A chave <b>"+esc(key)+"</b> não veio neste <code>apple_health.json</code>.<br>"+
+      "Gere um export novo e recarregue pra ver este gráfico.</div></div>";
+    return c;};
 
   if(H){const cc=chartCard("Composição corporal","cComp","Peso e massa magra (kg) · gordura (%) · faixas de meta tracejadas");cc.classList.add("full");grid.appendChild(cc);
     grid.appendChild(chartCard("Treino × Gordura","cTrFat","Volume mensal (barras) vs % gordura (linha) — a correlação-chave"));}
@@ -1073,8 +1343,14 @@ function renderAnalise(a){
   const pw=el("div");pw.style.cssText="position:relative;height:240px";const pcv=el("canvas");pcv.id="cProg";pw.appendChild(pcv);pc.appendChild(pw);
   grid.appendChild(pc);
   if(H){grid.appendChild(chartCard("Cardio (min/mês)","cCardio","Treinos de cardio registrados no Apple Watch"));
-    if(H.daily.StepCount)grid.appendChild(chartCard("Passos (méd/dia por mês)","cSteps","meta 8.000/dia"));
-    if(H.daily.AppleExerciseTime)grid.appendChild(chartCard("Minutos de exercício (méd/dia por mês)","cExerc","anéis do Watch"));
+    /* "meta 8.000/dia" saiu: 8k é referência geral de saúde, não está no plano do vault,
+       e ele anda 13,6 mil. Meta que ninguém decidiu é o 216 do cardio em escala menor. */
+    grid.appendChild(H.daily.Steps
+      ? chartCard("Passos (méd/dia por mês)","cSteps","referência 8.000/dia (geral — o plano não tem meta de passos)")
+      : chartAusente("Passos (méd/dia por mês)","Steps"));
+    grid.appendChild(H.daily.ExerciseMinutes
+      ? chartCard("Minutos de exercício (méd/dia por mês)","cExerc","anéis do Watch")
+      : chartAusente("Minutos de exercício (méd/dia por mês)","ExerciseMinutes"));
     grid.appendChild(chartCard("Recuperação (FC repouso × HRV)","cRec","bpm e ms"));
     grid.appendChild(chartCard("VO2 Max","cVO2",""));
     grid.appendChild(chartCard("Sono (méd h/noite por mês)","cSleep","* soma de intervalos — direção confiável, valor absoluto pode inflar"));}
@@ -1170,13 +1446,13 @@ function buildCharts(sess,H){
     ]},options:{maintainAspectRatio:false,scales:{y:{position:"left",title:{display:true,text:"min"}},y1:{position:"right",grid:{drawOnChartArea:false},min:0,title:{display:true,text:"nº"}}}}});
 
     // passos (méd/dia por mês)
-    if(H.daily.StepCount){const stm=moAvg(H.daily.StepCount);const stk=Object.keys(stm).sort().filter(m=>m>="2025-11");
+    if(H.daily.Steps){const stm=moAvg(H.daily.Steps);const stk=Object.keys(stm).sort().filter(m=>m>="2025-11");
       mk("cSteps",{data:{labels:stk,datasets:[
         {type:"bar",label:"passos/dia",data:stk.map(m=>Math.round(stm[m])),backgroundColor:"rgba(34,197,94,.5)"},
-        {type:"line",label:"meta 8k",data:stk.map(()=>8000),borderColor:WARN,borderDash:[5,4],borderWidth:1.5,pointRadius:0},
+        {type:"line",label:"referência 8k",data:stk.map(()=>8000),borderColor:WARN,borderDash:[5,4],borderWidth:1.5,pointRadius:0},
       ]},options:{maintainAspectRatio:false,scales:{y:{title:{display:true,text:"passos"}}}}});}
     // minutos de exercício (méd/dia por mês)
-    if(H.daily.AppleExerciseTime){const exm=moAvg(H.daily.AppleExerciseTime);const exk=Object.keys(exm).sort().filter(m=>m>="2025-11");
+    if(H.daily.ExerciseMinutes){const exm=moAvg(H.daily.ExerciseMinutes);const exk=Object.keys(exm).sort().filter(m=>m>="2025-11");
       mk("cExerc",{type:"bar",data:{labels:exk,datasets:[{label:"min/dia",data:exk.map(m=>Math.round(exm[m])),backgroundColor:"rgba(59,130,246,.55)"}]},options:{maintainAspectRatio:false,scales:{y:{title:{display:true,text:"min"}}}}});}
   }
 
@@ -1206,6 +1482,14 @@ function renderCfg(a){
   const b1=el("div");b1.appendChild(el("label","fld","Ciclo"));b1.appendChild(ci);
   const b2=el("div");b2.appendChild(el("label","fld","Plano"));b2.appendChild(pl);
   g.appendChild(b1);g.appendChild(b2);c1.appendChild(g);
+  /* P4.1 — a meta semanal alimenta o contador da Home. Mora aqui e não no código porque a
+     R6 já baixou de 4 pra 3, e meta hardcoded sobrevive à decisão que a mudou. */
+  const g2=el("div","grid2");
+  const wg=el("input");wg.type="number";wg.min="1";wg.max="14";wg.inputMode="numeric";
+  wg.value=weekGoal();wg.oninput=()=>{cfg.weekGoal=parseInt(wg.value,10)||WEEK_GOAL_DEFAULT;save(K.cfg,cfg);};
+  const b3=el("div");b3.appendChild(el("label","fld","Meta de treinos por semana"));b3.appendChild(wg);
+  g2.appendChild(b3);c1.appendChild(g2);
+  c1.appendChild(el("div","muted","Aparece na Home como <b>N registrados · meta M</b>. Conta só o que foi registrado neste app."));
   a.appendChild(c1);
 
   // music
@@ -1218,6 +1502,19 @@ function renderCfg(a){
   const tb=el("button","btn-ghost btn-sm","▶ Testar abrir");tb.style.marginTop="8px";tb.onclick=openMusic;
   cm.appendChild(tb);
   a.appendChild(cm);
+
+  /* P5.1 — o alarme nunca tocou no iPhone e nada na tela dizia isso. Testar aqui é o
+     mesmo precedente do "▶ Testar abrir" da playlist: um toque, e a tela conta o que
+     aconteceu de fato — não um toast que afirma sucesso sem saber. */
+  const ca=el("div","card");
+  ca.appendChild(el("h3",null,"🔔 Alarme do fim do descanso"));
+  ca.appendChild(el("div","muted","O iPhone só libera som depois de um toque, então o app libera no <b>▶ Descanso</b>. "+
+    "Se o alarme não soar durante o treino, teste aqui. <b>O botão de silencioso na lateral do iPhone cala o som</b> — isso o app não tem como contornar."));
+  const est=el("div","muted");est.style.marginTop="8px";est.textContent="estado: "+audioEstado();
+  const ba=el("button","btn-ghost btn-sm","🔔 Testar alarme");ba.style.marginTop="8px";
+  ba.onclick=()=>{ba.disabled=true;armAudio(ok=>{if(ok)beep();est.textContent="estado: "+audioEstado();ba.disabled=false;});};
+  ca.appendChild(ba);ca.appendChild(est);
+  a.appendChild(ca);
 
   // edit templates
   const c2=el("div","card");
@@ -1510,13 +1807,49 @@ function doImport(){
    continua em showMarkdown(), como cópia pra área de transferência. */
 
 /* ============ VERSÃO ============ */
-const APP_VERSION="1.4.1";
+const APP_VERSION="1.6.1";
 const APP_RELEASED="2026-08-31";
 /* Versionamento semântico MAJOR.MINOR.PATCH
    MAJOR = muda o formato dos dados (backup/restore incompatível)
    MINOR = funcionalidade nova, dados compatíveis
    PATCH = correção sem mudar comportamento                        */
 const APP_CHANGELOG=[
+ {v:"1.6.1",d:"2026-08-31",c:[
+   "O alarme do fim do descanso passou a tocar no iPhone — nunca tocou, em 81 sessões",
+   "O AudioContext nascia dentro do tick do cronômetro: fora de gesto do usuário o iOS o deixa suspenso e mudo",
+   "Agora ele é liberado no toque em ▶ Descanso, que é o mesmo gesto que inicia a contagem",
+   "Ajustes → 🔔 Testar alarme diz o que aconteceu de fato, com a hora em que tocou",
+   "Alarme que não toca vira linha no Diagnóstico de dados, em vez de um catch vazio",
+   "navigator.vibrate saiu: o Safari do iOS não implementa, era código que parecia fazer algo",
+   "A tela avisa que o botão de silencioso do iPhone cala o som — isso o app não contorna"]},
+ {v:"1.6.0",d:"2026-08-31",c:[
+   "Adicionar exercício virou lista tocável, ordenada por nº de sessões — o prompt() de texto livre saiu da porta principal",
+   "53% das sessões têm exercício fora do template: adicionar no meio do treino é o normal, não o acidente",
+   "Os 9 nomes mais usados cobrem 59 dos 74 usos, então a resposta certa fica nas primeiras linhas sem digitar nada",
+   "Filtro opcional no topo, sem foco automático: abrir o teclado por padrão anularia o ganho de não digitar",
+   "Criar nome novo continua possível e visível: última linha, + criar \"texto\" — nunca escondido",
+   "Nome que normaliza igual a um do histórico usa o nome do histórico: OVERHEAD BANCO grava Overhead banco",
+   "Caixa, acento e pontuação deixam de partir série histórica em duas chaves — e a tela diz qual nome usou",
+   "Sem sessões, a lista mostra os templates; histórico ilegível mostra os templates e diz que não leu"]},
+ {v:"1.5.0",d:"2026-08-31",c:[
+   "A Home responde as duas perguntas: quantos registrei esta semana, e qual letra está mais atrasada",
+   "Contador da semana (seg–dom) na Home: 'N registrados · meta M' — a métrica de processo saiu de Ajustes",
+   "Diz 'registrados', não 'treinos': em agosto foram 11 treinos e 9 registros, e errar pra baixo é o erro caro",
+   "A meta semanal virou campo em Ajustes (default 3, o que a R6 baixou) — não é mais número no código",
+   "A grade de treinos ordena por dias sem treinar, não por A/B/C/D: o D estava há 24 dias e aparecia por último",
+   "O card diz 'há 24 dias' em vez de 'último: 2026-08-07' — ninguém faz conta de data na porta da academia",
+   "Acima de 10 dias o número fica em amarelo: 4 letras ÷ 3 sessões/semana é um ciclo de 9,3 dias",
+   "Template nunca treinado vai pro topo, mas diz 'nunca treinado' e sem cor — ausência não se disfarça de atraso",
+   "Histórico que não pôde ser lido não vira zero nem 'nunca treinado': as duas telas dizem que não veio"]},
+ {v:"1.4.2",d:"2026-08-31",c:[
+   "Passos e Minutos de exercício voltaram à Análise — liam StepCount/AppleExerciseTime, o export tem Steps/ExerciseMinutes",
+   "Dois gráficos e dois KPIs prontos que nunca renderizaram contra nenhum export v2",
+   "Chave que não vem no apple_health.json agora aparece dizendo qual faltou, em vez de sumir um card",
+   "'meta 8.000/dia' virou 'referência': 8k é número geral de saúde, não meta deste plano",
+   "Exercício marcado sem nenhuma série exibe ↷ pulado, não ✓ feito — nos dados já estava certo",
+   "Nome de exercício novo passa por .trim(): 'Abdômen voador ' não parte mais a série histórica em duas",
+   "Retomar o treino (reload ou Continuar treino →) leva a tela até o exercício do momento",
+   "Descanso com carimbo de mais de 2h não é restaurado: aba esquecida não é pausa"]},
  {v:"1.4.1",d:"2026-08-31",c:[
    "O gráfico de cardio passou a contar a escada (StairClimbing) — 6 sessões de agosto estavam invisíveis",
    "Só em jul/26 e ago/26 eram 154 e 186 min fora da conta; o total do mês sobe, nada mais muda",
@@ -1558,6 +1891,7 @@ const APP_CHANGELOG=[
 
 /* ============ BOOT ============ */
 requestPersist();applyTheme();
+if(active)wantScrollActive=true;   // P4.7: reload no meio do treino volta pro exercício do momento
 render();
 </script>
 </body>
