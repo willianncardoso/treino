@@ -1072,7 +1072,7 @@ function renderAnalise(a){
   pc.innerHTML="<h3 style='margin:0 0 6px'>Progressão por exercício</h3>";pc.appendChild(sel);
   const pw=el("div");pw.style.cssText="position:relative;height:240px";const pcv=el("canvas");pcv.id="cProg";pw.appendChild(pcv);pc.appendChild(pw);
   grid.appendChild(pc);
-  if(H){grid.appendChild(chartCard("Cardio (min/mês)","cCardio","Caminhada · bike · corrida (do Apple Watch)"));
+  if(H){grid.appendChild(chartCard("Cardio (min/mês)","cCardio","Treinos de cardio registrados no Apple Watch"));
     if(H.daily.StepCount)grid.appendChild(chartCard("Passos (méd/dia por mês)","cSteps","meta 8.000/dia"));
     if(H.daily.AppleExerciseTime)grid.appendChild(chartCard("Minutos de exercício (méd/dia por mês)","cExerc","anéis do Watch"));
     grid.appendChild(chartCard("Recuperação (FC repouso × HRV)","cRec","bpm e ms"));
@@ -1156,7 +1156,10 @@ function buildCharts(sess,H){
     mk("cSleep",{type:"bar",data:{labels:smk,datasets:[{label:"h/noite",data:smk.map(m=>sm[m]),backgroundColor:"rgba(59,130,246,.55)"}]},options:{maintainAspectRatio:false,scales:{y:{title:{display:true,text:"h"}}}}});
 
     // cardio (min/mês) por tipo, do Apple Watch
-    const CARDIO=["Walking","Cycling","Running","IndoorCycle","Elliptical","HIIT"];
+    const CARDIO=["Walking","Cycling","Running","IndoorCycle","Elliptical","HIIT","StairClimbing"];
+    /* v1.4.1: StairClimbing entrou — é a cardio preferida do plano (stair stepper) e ficou
+       154 min de jul/26 e 186 min de ago/26 fora do gráfico. O subtítulo do card é genérico
+       de propósito: quem mexer nesta lista não precisa lembrar de mexer no texto da tela. */
     const cmin={},ccnt={};(H.workouts||[]).forEach(w=>{if(!w.date||!CARDIO.some(t=>(w.type||"").includes(t)))return;const y=w.date.slice(0,7);cmin[y]=(cmin[y]||0)+(w.duration_min||0);ccnt[y]=(ccnt[y]||0)+1;});
     const cmk=Object.keys(cmin).sort().filter(m=>m>="2025-11");
     const goalMin=8*27; // meta ~2x/sem * ~27min * 4 sem ≈ 216 min/mês
@@ -1507,13 +1510,17 @@ function doImport(){
    continua em showMarkdown(), como cópia pra área de transferência. */
 
 /* ============ VERSÃO ============ */
-const APP_VERSION="1.4.0";
+const APP_VERSION="1.4.1";
 const APP_RELEASED="2026-08-31";
 /* Versionamento semântico MAJOR.MINOR.PATCH
    MAJOR = muda o formato dos dados (backup/restore incompatível)
    MINOR = funcionalidade nova, dados compatíveis
    PATCH = correção sem mudar comportamento                        */
 const APP_CHANGELOG=[
+ {v:"1.4.1",d:"2026-08-31",c:[
+   "O gráfico de cardio passou a contar a escada (StairClimbing) — 6 sessões de agosto estavam invisíveis",
+   "Só em jul/26 e ago/26 eram 154 e 186 min fora da conta; o total do mês sobe, nada mais muda",
+   "O subtítulo do card parou de listar três modalidades: agora diz a fonte, não o elenco"]},
  {v:"1.4.0",d:"2026-08-31",c:[
    "Um botão só: ⬇ Backup pro vault, mesmo rótulo na tela de fim de treino e em Ajustes",
    "Um toque exporta um arquivo — saíram o treinos.json (regenerado no Mac) e o Todos os .md",
