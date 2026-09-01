@@ -43,7 +43,10 @@ button:disabled:active{opacity:.42}
 .btn-blue{background:var(--accent2);color:#0b0f14;font-weight:600}     /* P5.5: #fff dava 3,68:1; escuro dá 5,23:1 */
 .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
 .btn-danger{background:transparent;border:1px solid var(--danger-tx);color:var(--danger-tx)}
-.btn-sm{padding:8px 12px;font-size:13px}
+/* P5.9 — 8px+13px dava ~34px de altura, contra os 44 do mínimo da Apple. Atinge ✓/▴, 🔍,
+   + Série, ▶ Descanso, o MD da Home e os dois botões da barra de descanso. A fonte fica
+   em 13px: quem cresce é o alvo, não o texto. */
+.btn-sm{padding:8px 12px;font-size:13px;min-height:44px}
 .row{display:flex;gap:10px;align-items:center}
 .row.wrap{flex-wrap:wrap}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -65,8 +68,10 @@ label.fld{display:block;font-size:11px;color:var(--muted);text-align:center;marg
 .exdone{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--radius);padding:13px 15px;margin-bottom:12px;cursor:pointer;transition:opacity .2s}
 .exdone:active{opacity:.6}
 .exdone .ck{color:var(--accent-tx);font-weight:800;font-size:16px}
-.exdone .nm{font-weight:650;font-size:15px}
-.exdone .sm{color:var(--muted);font-size:13px;margin-left:auto;text-align:right}
+/* P5.10 — 'Agachamento Búlgaro - Smith' + '3× 30kg×10' não cabem em 375px. Quem trunca é
+   o NOME, que é rótulo; o resumo das séries é o dado e nunca é cortado. */
+.exdone .nm{font-weight:650;font-size:15px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.exdone .sm{color:var(--muted);font-size:13px;margin-left:auto;text-align:right;flex:0 0 auto;white-space:nowrap}
 .lastbox{background:var(--surface2);border-left:3px solid var(--accent);border-radius:8px;padding:9px 11px;margin-bottom:9px}
 .lastbox .hl{color:var(--text);font-weight:600;font-size:16px;margin-top:2px;line-height:1.35}
 .lastbox .lbl{font-size:10px;letter-spacing:.5px;color:var(--muted)}
@@ -92,8 +97,17 @@ label.fld{display:block;font-size:11px;color:var(--muted);text-align:center;marg
 .pill{display:inline-block;padding:3px 8px;border-radius:20px;background:var(--surface2);font-size:12px;color:var(--muted);margin:2px 4px 2px 0}
 .sessionbar{position:fixed;left:0;right:0;bottom:calc(66px + env(safe-area-inset-bottom));z-index:45;display:none;padding:0 12px;pointer-events:none}
 .sessionbar.on{display:block}
+/* P5.4 — o teclado numérico do iOS não tem tecla de retorno, e .sessionbar/.tabbar são
+   fixed no LAYOUT viewport: o teclado passa por cima das duas e leva junto o cronômetro,
+   o 🏁 Próxima e o Parar — no momento mais frequente do app. --kb é a altura coberta,
+   medida pelo visualViewport. Com o teclado aberto a barra se ancora nele e não na
+   tabbar, que está debaixo do teclado: empilhar em cima do que sumiu não adianta. */
+body.kb .sessionbar{bottom:calc(var(--kb,0px) + 8px)}
 .sb-inner{max-width:640px;margin:0 auto;position:relative;min-height:60px;border-radius:14px;overflow:hidden;pointer-events:auto;background:var(--surface2);border:1px solid var(--border);box-shadow:0 6px 22px rgba(0,0,0,.45);transition:background-color .3s ease,border-color .3s ease}
-.sessionbar.resting .sb-inner{background:var(--accent2);border-color:transparent}
+/* .sb-idle e .sb-rest são absolute: não empurram a altura do pai. Com os botões em 44px
+   (P5.9) o conteúdo do descanso passa de 60px e o overflow:hidden cortaria o 🏁 Próxima.
+   Só o estado de descanso cresce — em repouso a barra continua com 60px. */
+.sessionbar.resting .sb-inner{background:var(--accent2);border-color:transparent;min-height:82px}
 .sb-idle,.sb-rest{position:absolute;inset:0;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 16px;transition:opacity .25s ease}
 .sb-rest{opacity:0;pointer-events:none}
 .sessionbar.resting .sb-idle{opacity:0;pointer-events:none}
@@ -103,6 +117,12 @@ label.fld{display:block;font-size:11px;color:var(--muted);text-align:center;marg
 .sb-rest .sb-lbl{color:rgba(255,255,255,.8)}
 .sessionbar.resting.over .sb-inner{background:var(--danger);animation:pulseOver 1s ease-in-out infinite}
 @keyframes pulseOver{0%,100%{box-shadow:0 6px 22px rgba(239,68,68,.5)}50%{box-shadow:0 6px 30px rgba(239,68,68,.85)}}
+/* P5.12 — o pulso é a única animação contínua do app. Com movimento reduzido ele PARA,
+   mas não some: o fundo vermelho e a sombra forte ficam. Enquanto o alarme depender de
+   som (que o botão de silencioso cala), este é o aviso visual de que a pausa estourou. */
+@media (prefers-reduced-motion: reduce){
+  .sessionbar.resting.over .sb-inner{animation:none;box-shadow:0 6px 30px rgba(239,68,68,.85)}
+}
 .ex.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 4px 16px rgba(34,197,94,.12)}
 .ex.active .ex-title::before{content:"▶ ";color:var(--accent-tx);font-size:12px}
 .sess{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--border)}
@@ -335,7 +355,59 @@ function completedSets(e){return e.sets.filter(s=>s.r!==""&&s.r!=null).length;}
 const INTER_REST=120; // descanso padrão entre exercícios (2min)
 function topWeight(sets){return sets.reduce((a,s)=>Math.max(a,parseFloat(s.w)||0),0);}
 function fmtClock(ts){if(!ts)return"--:--";const d=new Date(ts);return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");}
-function durMin(s){if(!s.started||!s.finished)return null;return Math.max(1,Math.round((s.finished-s.started)/60000));}
+/* P1.11 — `finished` não está errado: registra que o botão foi apertado em 26/08 às 09h41.
+   Errado era `durMin` chamar `finished - started` de DURAÇÃO DO TREINO. Dois conceitos com
+   um nome só, que coincidem só quando o fecho é imediato — e em duas sessões não foi:
+   14/08 marcava 1654 min e 21/08, 6614 min.
+   A saída óbvia ("usar o último `t` de série") NÃO funciona: o finishSession faz
+   `if(!st.t)st.t=sess.finished`, então 72 das 353 séries carimbadas (20,4%) carregam o
+   instante do fecho. Nas duas quebradas o maior `t` É o `finished`, ao segundo. Por isso
+   "carimbo real" exclui `t===finished`.
+   Limiar de 30 min sai do dado, que é bimodal: gap mediano de 1,1 min, 17 de 19 abaixo de
+   15 min, e depois NADA até 1601 e 6564 min. 20× acima do maior gap normal, 50× abaixo do
+   menor quebrado. Resultado: 14/08 → 53 min, 21/08 → 50 min (mediana das normais: 51), e as
+   outras 17 não mudam nem um minuto. Nada gravado muda — `started`, `finished` e todos os
+   `t` ficam como estão, e o backup continua byte a byte igual. */
+const DUR_GAP_TARDIO=30*60000;
+/* Sem carimbo nenhum não dá pra reconstruir; sobra `finished - started`, que só é descartado
+   quando é implausível como treino. 12 h é o mesmo teto que o validateSession já usa pra
+   avisar — a sessão mais longa do histórico tem 1h21. Ver a nota no relatório da v1.10.1:
+   a única sessão sem carimbo (2026-07-09) tem 47 min no mesmo dia, e devolver `null` ali
+   trocaria um número bom por "não registrada". */
+const DUR_MAX_PLAUSIVEL=12*36e5;
+function ultimoSetReal(s){
+  let mx=null;
+  (s&&s.exercises||[]).forEach(e=>(e.sets||[]).forEach(st=>{
+    if(!st.t||st.t===s.finished)return;          // carimbo posto no fecho não é evento do treino
+    if(mx==null||st.t>mx)mx=st.t;}));
+  return mx;
+}
+function durAtraso(s){                            // ms entre a última série e o clique, quando houve
+  if(!s||!s.started||!s.finished)return null;
+  const t=ultimoSetReal(s);
+  return (t!=null&&(s.finished-t)>DUR_GAP_TARDIO)?(s.finished-t):null;
+}
+function durMin(s){
+  if(!s||!s.started||!s.finished)return null;     // importada, sem carimbo: nada a dizer
+  const t=ultimoSetReal(s);
+  if(t!=null&&(s.finished-t)>DUR_GAP_TARDIO)return Math.max(1,Math.round((t-s.started)/60000));
+  if(t==null&&(s.finished-s.started)>DUR_MAX_PLAUSIVEL)return null;   // cicatriz nº 1: não inventa
+  return Math.max(1,Math.round((s.finished-s.started)/60000));
+}
+function fmtAtraso(ms){
+  const min=Math.round(ms/60000);if(min<90)return min+" min depois";
+  const h=Math.round(ms/36e5);if(h<36)return h+" h depois";
+  const d=Math.round(ms/864e5);return d+(d===1?" dia depois":" dias depois");
+}
+/* A demora não é omitida: onde a duração aparece, a sessão reconstruída diz que foi fechada
+   depois. Em `muted`, sem cor de alarme — é fato, e ele já mudou o comportamento. Sessão com
+   carimbos de fecho e nenhum evento real diz "duração não registrada", nunca zero. */
+function durTxt(s){
+  const m=durMin(s);
+  if(m==null)return (s&&s.started&&s.finished)?"duração não registrada":null;
+  const atr=durAtraso(s);
+  return m+" min"+(atr?" · finalizada "+fmtAtraso(atr):"");
+}
 function fmtDur(ms){const t=Math.max(0,Math.floor(ms/1000));const h=Math.floor(t/3600),m=Math.floor((t%3600)/60),sec=t%60;
   return (h?h+":"+String(m).padStart(2,"0"):m)+":"+String(sec).padStart(2,"0");}
 let elapsedId=null;
@@ -447,9 +519,44 @@ function beep(){
   }catch(e){audioMsg="falhou ao tocar: "+e.message;logIO("beep-fail","descanso",e.message);return false;}
 }
 
+/* ============ TECLADO (P5.4) ============ */
+/* O visualViewport é a única fonte da altura do teclado no iOS. Sem ele (navegador
+   antigo) nada muda: a barra fica onde sempre esteve e o app não fica pior. */
+let kbPx=0;
+function trackKeyboard(){
+  const vv=window.visualViewport;if(!vv)return;
+  let ult=-1;
+  const upd=()=>{
+    const bruto=Math.round(window.innerHeight-(vv.height+vv.offsetTop));
+    const h=bruto>90?bruto:0;      // <90px é a barra do Safari encolhendo, não teclado
+    if(h===ult)return;ult=h;kbPx=h;
+    document.documentElement.style.setProperty("--kb",h+"px");
+    document.body.classList.toggle("kb",h>0);
+  };
+  vv.addEventListener("resize",upd);vv.addEventListener("scroll",upd);upd();
+}
+/* O iOS rola sozinho até o campo focado, mas não sabe que existe uma barra fixa por
+   cima dele. Reserva a altura da barra quando ela está na tela e só rola se o campo
+   ficou mesmo coberto — rolar sempre trocaria um problema por um solavanco. */
+function keepFieldVisible(i){
+  setTimeout(()=>{
+    if(document.activeElement!==i||!i.isConnected)return;
+    const vv=window.visualViewport;
+    const sb=$("#sessionbar");
+    const reserva=(sb&&sb.classList.contains("on"))?98:12;
+    const topo=(vv?vv.offsetTop:0)+8;
+    const base=(vv?vv.offsetTop+vv.height:window.innerHeight)-reserva;
+    const r=i.getBoundingClientRect();
+    if(r.bottom>base||r.top<topo)i.scrollIntoView({block:"center"});
+  },320);   // o teclado do iOS leva ~250ms pra terminar de subir
+}
+
 /* ============ NAV ============ */
 function isDesktop(){return window.matchMedia("(min-width: 900px)").matches;}
-function go(t){tab=t;bkState={phase:"idle"};addExOpen=false;render();window.scrollTo(0,0);}  // relatório de export é do toque, não do dia
+/* P5.12 — sair da tela de confirmação pela tabbar deixava `pendingSave` pendurado até o
+   reload. Não corrompe nada (o treino já está gravado e conferido), mas é estado morto:
+   quem não vai pra "save" não tem confirmação pendente. */
+function go(t){if(t!=="save")pendingSave=null;tab=t;bkState={phase:"idle"};addExOpen=false;render();window.scrollTo(0,0);}  // relatório de export é do toque, não do dia
 /* P4.7: ligado só na retomada de sessão (reload e "Continuar treino →"), consumido pela
    renderLog. Nunca a cada série — a lista não pode se mexer no meio do toque. */
 let wantScrollActive=false;
@@ -578,7 +685,7 @@ function renderHome(a){
     const c=el("div","card");
     sessions.slice(-5).reverse().forEach(s=>{
       const r=el("div","sess");
-      r.innerHTML="<div class='row'><span class='dot'>"+s.day+"</span><div><div style='font-weight:600'>"+esc(templates[s.day]?templates[s.day].name:s.day)+"</div><div class='muted'>"+s.date+" · "+Math.round(sessVol(s))+" kg·rep"+(durMin(s)?" · "+durMin(s)+" min":"")+"</div></div></div>";
+      r.innerHTML="<div class='row'><span class='dot'>"+s.day+"</span><div><div style='font-weight:600'>"+esc(templates[s.day]?templates[s.day].name:s.day)+"</div><div class='muted'>"+s.date+" · "+Math.round(sessVol(s))+" kg·rep"+(durTxt(s)?" · "+esc(durTxt(s)):"")+"</div></div></div>";
       const v=el("button","btn-ghost btn-sm","MD");v.onclick=()=>showMarkdown(s);
       r.appendChild(v);c.appendChild(r);
     });
@@ -857,6 +964,14 @@ function exCard(e,ei,isActive){
     return d;
   }
   const c=el("div","ex"+(isActive?" active":""));
+  /* P5.4 — sem tecla de retorno no teclado numérico, não existe "Pronto". Tocar em
+     qualquer ponto do próprio cartão que não seja campo nem botão fecha o teclado, em
+     vez de obrigar a caçar um vão da tela. */
+  c.addEventListener("pointerdown",ev=>{
+    if(ev.target.closest("input,select,textarea,button"))return;
+    const foco=document.activeElement;
+    if(foco&&foco!==document.body&&foco.blur)foco.blur();
+  });
   const head=el("div","ex-head");
   head.innerHTML="<div><span class='ex-title'>"+esc(e.n)+"</span>"+(e.mvw?"<span class='tag mvw'>🔑 MVW</span>":"")+
     (e.done?(pulado?"<span class='tag' style='background:rgba(148,163,184,.15);color:var(--muted)'>↷ pulado</span>"
@@ -927,7 +1042,7 @@ function updVol(card){const e=active.exercises[[...$("#app").querySelectorAll(".
   const v=card.querySelector("[data-vol]");if(v)v.textContent=Math.round(setVol(e.sets))+" kg·rep";
   const pv=$("#app").querySelector(".card .muted");}
 function inp(val,ph,on){const i=el("input");i.type="number";i.inputMode="decimal";i.placeholder=ph;i.value=val==null?"":val;
-  i.oninput=()=>on(i.value);return i;}
+  i.oninput=()=>on(i.value);i.onfocus=()=>keepFieldVisible(i);return i;}
 
 function lastLogFor(name,day){
   for(let i=sessions.length-1;i>=0;i--){const s=sessions[i];if(day&&s.day!==day)continue;
@@ -1216,16 +1331,43 @@ function showMarkdown(s){
    Quem exporta agora é o runBackup(), que nomeia cancelamento e falha na tela. */
 
 /* ---------- HISTÓRICO / CHARTS ---------- */
-let histEx=null, histMetric="peso";
+/* P5.6 — `histEx = names[0]` abria sempre em "Abdomen - máquina", o primeiro alfabético
+   entre 45 nomes: pra ver o que interessa, uma roda de 45 itens com uma mão. O padrão
+   passa a ser o exercício-chave da sessão mais recente — o mais provável de
+   ele querer ver logo depois de treinar — e a escolha vai pro cfg, sobrevivendo ao
+   reload. Só entra em `names`: exercício que saiu do histórico não seleciona nada. */
+function histExPadrao(names){
+  for(let i=sessions.length-1;i>=0;i--){
+    const exs=(sessions[i].exercises||[]).filter(e=>(e.sets||[]).length&&names.indexOf(e.n)>=0);
+    if(!exs.length)continue;
+    /* Dentro da sessão, o exercício-chave (MVW) ganha do último da lista. Medido na sessão
+       de 29/08: "último com série" abria em `Abdômen voador `, o acessório do fim; o primeiro
+       MVW abre em `Stiff - com barra solta`, que é o motivo do treino C existir. */
+    const chave=exs.filter(e=>e.mvw);
+    return (chave.length?chave[0]:exs[0]).n;
+  }
+  return names[0];
+}
+let histEx=(typeof cfg.histEx==="string"&&cfg.histEx)?cfg.histEx:null, histMetric="peso";
 function renderHist(a){
   a.appendChild(el("h1",null,"Histórico"));
-  if(!sessions.length){a.appendChild(el("div","empty","<div class='ic'>📈</div><div>Sem treinos ainda.<br>Registre uma sessão para ver a progressão.</div>"));return;}
+  /* Cicatriz nº 1, de carona: histórico que não pôde ser LIDO exibia "Sem treinos ainda.
+     Registre uma sessão" — vazio e ilegível são estados diferentes, e o segundo desaconselha
+     justamente o que a tela mandava fazer. */
+  if(!sessions.length){
+    const f=readFailed(K.sess);
+    a.appendChild(el("div","empty",f
+      ?"<div class='ic'>⚠️</div><div>O histórico não pôde ser lido — <b>"+esc(f)+"</b>.<br>Nada foi apagado. Ver <b>Ajustes → Diagnóstico de dados</b> antes de importar por cima.</div>"
+      :"<div class='ic'>📈</div><div>Sem treinos ainda.<br>Registre uma sessão para ver a progressão.</div>"));
+    return;}
 
   const names=[...new Set(sessions.flatMap(s=>s.exercises.map(e=>e.n)))].sort();
-  if(!histEx||!names.includes(histEx))histEx=names[0];
+  if(!histEx||!names.includes(histEx))histEx=histExPadrao(names);
 
   const sel=el("select");names.forEach(n=>{const o=el("option",null,esc(n));o.value=n;if(n===histEx)o.selected=true;sel.appendChild(o);});
-  sel.onchange=()=>{histEx=sel.value;render();};
+  sel.onchange=()=>{histEx=sel.value;cfg.histEx=histEx;
+    if(!save(K.cfg,cfg))toast("A escolha não foi gravada — ver Diagnóstico");
+    render();};
   const selCard=el("div","card");selCard.appendChild(el("label","fld","Exercício"));selCard.appendChild(sel);
   const seg=el("div","seg");
   [["peso","Carga máx"],["vol","Volume"],["e1rm","1RM est."]].forEach(([k,l])=>{const b=el("button",histMetric===k?"active":"",l);b.onclick=()=>{histMetric=k;render();};seg.appendChild(b);});
@@ -1257,7 +1399,7 @@ function renderHist(a){
     const ex=s.exercises.find(e=>e.n===histEx);
     const r=el("div","sess");
     if(i>=SHOW)r.style.display="none";
-    r.innerHTML="<div><div style='font-weight:600'>"+s.date+" <span class='muted'>("+s.day+")"+(durMin(s)?" · "+durMin(s)+"min":"")+"</span></div><div class='muted'>"+summarizeSets(ex.sets)+"</div></div>";
+    r.innerHTML="<div><div style='font-weight:600'>"+s.date+" <span class='muted'>("+s.day+")"+(durTxt(s)?" · "+esc(durTxt(s)):"")+"</span></div><div class='muted'>"+summarizeSets(ex.sets)+"</div></div>";
     dc.appendChild(r);
   });
   if(rows.length>SHOW){
@@ -1299,6 +1441,36 @@ function drawChart(cv,pts,unit){
 }
 
 /* ---------- ANÁLISE (desktop) ---------- */
+/* P6.3 — a pausa só existe quando ele usa ▶ Descanso → 🏁 Próxima: são 295 em 1.465 séries.
+   O alarme do fim do descanso passou a tocar na v1.6.1 (31/08); antes disso NENHUM dos 81
+   treinos teve aviso sonoro. Esta data separa as duas populações do cartão, e é o aceite de
+   resultado do P5.1: com o alarme funcionando, p90 e máximo têm que cair. */
+const ALARME_DESDE="2026-08-31";
+/* P6.1 — segunda-feira da semana de uma data AAAA-MM-DD, em hora local. O weekRange() já faz
+   isto pra semana corrente; aqui a conta precisa valer pra qualquer data do histórico. */
+function segundaDe(ds){const p=String(ds).split("-");
+  const d=new Date(+p[0],+p[1]-1,+p[2]);d.setDate(d.getDate()-((d.getDay()+6)%7));
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function maisDias(ds,n){const p=String(ds).split("-");
+  const d=new Date(+p[0],+p[1]-1,+p[2]);d.setDate(d.getDate()+n);
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+const PESO_LAG_DIAS=14;
+function pausasRegistradas(){
+  const out=[];
+  sessions.forEach(s=>(s.exercises||[]).forEach(e=>(e.sets||[]).forEach(st=>{
+    const v=(st.rest==null||st.rest==="")?null:+st.rest;
+    if(v==null||isNaN(v))return;
+    const meta=(e.rest==null||e.rest==="")?null:+e.rest;
+    out.push({d:s.date,seg:v,meta:(meta&&!isNaN(meta))?meta:null});})));
+  return out;
+}
+function quantil(a,p){if(!a.length)return null;const x=a.slice().sort((m,n)=>m-n);
+  const k=(x.length-1)*p,f=Math.floor(k),c=Math.ceil(k);
+  return f===c?x[f]:x[f]+(x[c]-x[f])*(k-f);}
+const REST_BIN=30, REST_BINS=9;                  // 0-30 … 240-270, e a última é 270+
+function restBin(v){return Math.min(REST_BINS,Math.floor(v/REST_BIN));}
+function restLabels(){const L=[];for(let i=0;i<REST_BINS;i++)L.push((i*REST_BIN)+"–"+((i+1)*REST_BIN));
+  L.push((REST_BINS*REST_BIN)+"+");return L;}
 const K_HEALTH="gymlog_health_v1";
 let charts=[], analProgEx=null;
 function destroyCharts(){charts.forEach(c=>{try{c.destroy();}catch(e){}});charts=[];}
@@ -1325,7 +1497,8 @@ function renderAnalise(a){
   const sess=normSessions();
   const raw=load(K_HEALTH,null);
   const H=raw&&raw.daily?raw:null;
-  const head=el("div","row");head.innerHTML="<div style='flex:1'><h1>Análise</h1><div class='muted'>"+sess.length+" sessões · Apple Health "+(H?"carregado ✓":"não carregado")+" · dados só neste navegador</div></div>";
+  const sessFail=readFailed(K.sess);
+  const head=el("div","row");head.innerHTML="<div style='flex:1'><h1>Análise</h1><div class='muted'>"+(sessFail?"<b style='color:var(--danger-tx)'>histórico não lido</b>":sess.length+" sessões")+" · Apple Health "+(H?"carregado ✓":"não carregado")+" · dados só neste navegador</div></div>";
   const fi=el("input");fi.type="file";fi.accept=".json";fi.style.display="none";
   fi.onchange=()=>{const f=fi.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);
     if(d.daily){save(K_HEALTH,d);toast("Apple Health carregado ✓");render();}else toast("Carregue o apple_health.json");}catch(e){toast("JSON inválido");}};rd.readAsText(f);};
@@ -1334,7 +1507,9 @@ function renderAnalise(a){
   th.onclick=()=>{cfg.theme=(cfg.theme==="light")?"dark":"light";save(K.cfg,cfg);applyTheme();render();};
   head.appendChild(th);head.appendChild(lb);head.appendChild(fi);a.appendChild(head);
 
-  if(!sess.length){a.appendChild(el("div","empty","<div class='ic'>📊</div><div>Sem treinos carregados neste navegador.<br>Vá em <b>Ajustes → ⬆ Importar</b> e carregue seu <b>treino-restore.json</b>.</div>"));return;}
+  if(!sess.length){a.appendChild(el("div","empty",sessFail
+    ?"<div class='ic'>⚠️</div><div>O histórico não pôde ser lido — <b>"+esc(sessFail)+"</b>.<br>Nada foi apagado, e a cópia bruta está preservada. Ver <b>Ajustes → Diagnóstico de dados</b> <u>antes</u> de importar por cima.</div>"
+    :"<div class='ic'>📊</div><div>Sem treinos carregados neste navegador.<br>Vá em <b>Ajustes → ⬆ Importar</b> e carregue seu <b>treino-restore.json</b>.</div>"));return;}
 
   // KPIs
   const kp=el("div");kp.style.cssText="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px";
@@ -1391,10 +1566,16 @@ function renderAnalise(a){
   prow.appendChild(el("span","muted","Início do ciclo:"));prow.appendChild(di);prow.appendChild(el("span","muted","Semanas:"));prow.appendChild(wi);
   pcard.appendChild(prow);a.appendChild(pcard);
 
-  if(!H)a.appendChild(el("div","muted","<div class='card' style='margin:0 0 14px'>Carregue o <b>apple_health.json</b> (do vault <code>_dados/</code>) pra ver composição corporal, recuperação e o cruzamento treino×gordura. Botão acima ↑</div>"));
+  /* P6.0 — a aba tinha 12 cartões soltos num dashgrid só, sem hierarquia; somar as onze
+     análises daria 23, e 23 gráficos numa página é o mesmo que zero. As quatro seções são as
+     quatro perguntas que a revisão de ciclo faz, nesta ordem. KPIs e Plano & Ciclo ficam ACIMA
+     da primeira: são o cabeçalho da aba, não análise — todo CARD DE ANÁLISE está sob um h2. */
+  const secao=(titulo,pergunta)=>{
+    const h=el("h2",null,esc(titulo)+" <span class='muted' style='font-weight:400'>— "+esc(pergunta)+"</span>");
+    h.style.margin="22px 0 10px";a.appendChild(h);
+    const g=el("div","dashgrid");a.appendChild(g);return g;};
 
   // layout de gráficos
-  const grid=el("div","dashgrid");
   const chartCard=(title,id,sub)=>{const c=el("div","card");c.style.margin="0";
     c.innerHTML="<h3 style='margin:0 0 2px'>"+title+"</h3>"+(sub?"<div class='muted' style='font-size:12px;margin-bottom:8px'>"+sub+"</div>":"<div style='height:8px'></div>");
     const wrap=el("div");wrap.style.cssText="position:relative;height:280px";const cv=el("canvas");cv.id=id;wrap.appendChild(cv);c.appendChild(wrap);return c;};
@@ -1408,9 +1589,20 @@ function renderAnalise(a){
       "Gere um export novo e recarregue pra ver este gráfico.</div></div>";
     return c;};
 
-  if(H){const cc=chartCard("Composição corporal","cComp","Peso e massa magra (kg) · gordura (%) · faixas de meta tracejadas");cc.classList.add("full");grid.appendChild(cc);
-    grid.appendChild(chartCard("Treino × Gordura","cTrFat","Volume mensal (barras) vs % gordura (linha) — a correlação-chave"));}
-  grid.appendChild(chartCard("Volume & frequência mensal","cVolFreq","Volume (barras) e nº de sessões (linha)"));
+  /* ===== 1 · ADERÊNCIA ===== */
+  const g1=secao("1 · Aderência","ele foi?");
+  g1.appendChild(chartCard("Volume & frequência mensal","cVolFreq","Volume (barras) e nº de sessões (linha)"));
+  /* P6.4 — sex 18 · ter 17 · qua 12 · sáb 12 · seg 10 · qui 10 · dom 2. A segunda-feira, onde o
+     plano põe a abertura da semana, é um dos dias mais fracos de toda a história. Descritivo:
+     sem meta, sem cor de alarme — o P4.10 já age sobre isto na Home. */
+  g1.appendChild(chartCard("Sessões por dia da semana","cDow","todo o histórico · descritivo, sem meta"));
+
+  /* ===== 2 · EXECUÇÃO ===== */
+  const g2=secao("2 · Execução","o que aconteceu no treino?");
+  g2.appendChild(cardDescanso());
+
+  /* ===== 3 · PROGRESSÃO ===== */
+  const g3=secao("3 · Progressão","está ficando mais forte?");
   // progressão por exercício
   const pc=el("div","card");pc.style.margin="0";
   const names=[...new Set(sess.flatMap(s=>s.exercises.map(e=>e.name)))].sort();
@@ -1419,7 +1611,16 @@ function renderAnalise(a){
   sel.onchange=()=>{analProgEx=sel.value;render();};
   pc.innerHTML="<h3 style='margin:0 0 6px'>Progressão por exercício</h3>";pc.appendChild(sel);
   const pw=el("div");pw.style.cssText="position:relative;height:240px";const pcv=el("canvas");pcv.id="cProg";pw.appendChild(pcv);pc.appendChild(pw);
-  grid.appendChild(pc);
+  g3.appendChild(pc);
+  g3.appendChild(cardTetoCarga(sess));
+  g3.appendChild(cardVolLetra(sess));
+
+  /* ===== 4 · RESULTADO ===== */
+  const g4=secao("4 · Resultado","o corpo mudou?");
+  const grid=g4;                                  // os cartões do Health vivem todos aqui
+  if(!H){const av=el("div","card","<div class='empty' style='padding:24px 12px'><div class='ic'>📭</div><div>Carregue o <b>apple_health.json</b> (do vault <code>_dados/</code>) pra ver composição corporal, recuperação e o cruzamento treino×gordura. Botão no topo da página ↑</div></div>");av.classList.add("full");g4.appendChild(av);}
+  if(H){const cc=chartCard("Composição corporal","cComp","Peso e massa magra (kg) · gordura (%) · faixas de meta tracejadas");cc.classList.add("full");grid.appendChild(cc);
+    grid.appendChild(chartCard("Treino × Gordura","cTrFat","Volume mensal (barras) vs % gordura (linha) — a correlação-chave"));}
   if(H){
     /* P1.8 — o rótulo nomeia FONTE e FILTRO, nunca virtude. "Cardio" afirmava que o que
        estava ali era treino; contava 834 min de caminhada de deslocamento em agosto (FC
@@ -1439,11 +1640,10 @@ function renderAnalise(a){
       : chartAusente("Minutos de exercício (méd/dia por mês)","ExerciseMinutes"));
     grid.appendChild(chartCard("Recuperação (FC repouso × HRV)","cRec","bpm e ms"));
     grid.appendChild(chartCard("VO2 Max","cVO2",""));
-    grid.appendChild(chartCard("Sono (méd h/noite por mês)","cSleep","* soma de intervalos — direção confiável, valor absoluto pode inflar"));}
-  a.appendChild(grid);
-
+    grid.appendChild(chartCard("Sono (méd h/noite por mês)","cSleep","* soma de intervalos — direção confiável, valor absoluto pode inflar"));
+    grid.appendChild(cardDefasagem(H));}
   // PRs — quando bateu cada recorde (ordenado por data, recentes destacados)
-  const prc=el("div","card");prc.style.marginTop="14px";
+  const prc=el("div","card");prc.style.margin="0";prc.classList.add("full");
   const prm={};sess.forEach(s=>s.exercises.forEach(e=>{if(e.top>((prm[e.name]||{}).top||0))prm[e.name]={top:e.top,date:s.date};}));
   const lastDate=sess.length?sess[sess.length-1].date:null;
   const rows=Object.keys(prm).map(n=>({n,top:prm[n].top,date:prm[n].date}))
@@ -1452,12 +1652,194 @@ function renderAnalise(a){
     "<table style='width:100%;border-collapse:collapse;font-size:14px;margin-top:6px'>";
   rows.forEach(r=>{const isRecent=lastDate&&(new Date(lastDate)-new Date(r.date))/864e5<=45;
     prh+="<tr style='border-top:1px solid var(--border)'><td style='padding:7px 0'>"+(isRecent?"🟢 ":"")+esc(r.n)+"</td><td style='text-align:right;font-weight:700"+(isRecent?";color:var(--accent-tx)":"")+"'>"+r.top+" kg</td><td style='text-align:right;color:var(--muted);padding-left:10px;white-space:nowrap'>"+fmtD(r.date)+"</td></tr>";});
-  prh+="</table>";prc.innerHTML=prh;a.appendChild(prc);
+  prh+="</table>";prc.innerHTML=prh;g3.appendChild(prc);
   a.appendChild(el("div",null,"<div style='height:40px'></div>"));
 
   // renderiza gráficos
   ensureChart(()=>buildCharts(sess,H));
 }
+/* P6.7 — a pergunta era "volume por grupo muscular", e o app NÃO SABE o que é quadríceps:
+   zero ocorrências de grupo muscular no arquivo. O `muscles` do treinos.json vem do Python
+   lendo as notas do vault e está sujo (37 exercícios marcados "Tipo: Exercício Físico",
+   `Glúteos` vs `Glúteos Superior`, `Panturilha`). Popular um mapa à mão pra 45 nomes e mantê-lo
+   a cada troca de ciclo é o custo que já foi recusado em "Não vai ser feito".
+   O split É a divisão muscular deste programa, então a resposta sai por letra — dado que o app
+   já tem. Por isso nenhum nome de grupo muscular entra na tela, nem pelo templates[].name.
+   E é MÉDIA POR SESSÃO, não soma do mês: julho teve 13 sessões e agosto 9, e a soma faria
+   julho parecer um mês diferente quando foi só o mês em que ele mais treinou. */
+const LETRAS=["A","B","C","D"];
+function cardVolLetra(sess){
+  const c=el("div","card");c.style.margin="0";c.classList.add("full");
+  let h="<h3 style='margin:0 0 2px'>Volume por letra (média por sessão)</h3>";
+  if(!sess.length){c.innerHTML=h+"<div class='empty' style='padding:24px 12px'><div class='ic'>📊</div><div>Sem sessões carregadas.</div></div>";return c;}
+  const meses=[...new Set(sess.map(s=>s.date.slice(0,7)))].sort();
+  const conta={};sess.forEach(s=>{const k=s.day+"|"+s.date.slice(0,7);(conta[k]=conta[k]||[]).push(s.vol);});
+  /* Lacuna NÃO é zero: em agosto o D teve zero sessões, e não treinar é diferente de treinar
+     leve. A linha se interrompe (spanGaps:false) e a ausência é dita em texto. */
+  const ult=meses.slice(-3);
+  const faltas=ult.map(m=>{const f=LETRAS.filter(L=>!conta[L+"|"+m]);
+      return f.length?mesRotulo(m)+": sem "+f.join(", "):null;}).filter(Boolean);
+  h+="<div class='muted' style='font-size:12px;margin-bottom:8px'>kg·rep médio por sessão de cada treino, por mês · a soma do mês faria julho (13 sessões) parecer diferente de agosto (9) sem que o treino tivesse mudado</div>";
+  c.innerHTML=h;
+  const wrap=el("div");wrap.style.cssText="position:relative;height:280px";
+  const cv=el("canvas");cv.id="cVolLetra";wrap.appendChild(cv);c.appendChild(wrap);
+  const n=el("div","muted");n.style.marginTop="6px";
+  n.innerHTML="linha interrompida = mês sem nenhuma sessão daquela letra, que não é volume zero"+
+    (faltas.length?"<br>últimos 3 meses — "+esc(faltas.join(" · ")):"<br>sem lacunas nos últimos 3 meses");
+  c.appendChild(n);return c;
+}
+function mesRotulo(m){const p=String(m).split("-");return (MESN[(+p[1])-1]||p[1])+"/"+p[0].slice(2);}
+
+/* P6.1 — a defasagem entre treinar e a balança. r = −0,64 entre treinos/semana e peso médio 14
+   dias depois (n=16, fev–ago) é a única coisa nos dados ligando esforço a resultado com atraso.
+   Duas regras que a tela obedece:
+   1) NENHUMA PREVISÃO. O cartão mostra associação passada; nada de "treinar N vezes → perder X".
+   2) O confundidor vai NO CORPO, não no rodapé: semana de mais treino costuma ser semana de
+      melhor alimentação, e a R6 concluiu por eliminação que a alavanca é energia. É provável
+      que este gráfico esteja medindo nutrição vestida de treino, e isso está escrito na tela.
+   O r não vai pra tela de propósito: com n=16 ele muda de −0,64 pra −0,12 se a janela incluir
+   as duas semanas isoladas de 2025. Número frágil na tela vira número citado. */
+function cardDefasagem(H){
+  const bm=(H&&H.daily&&H.daily.BodyMass_kg)||null;
+  if(!bm)return chartAusenteGlobal("Treino × peso (defasagem de "+PESO_LAG_DIAS+" dias)","BodyMass_kg");
+  const c=el("div","card");c.style.margin="0";c.classList.add("full");
+  let h="<h3 style='margin:0 0 2px'>Treino × peso (defasagem de "+PESO_LAG_DIAS+" dias)</h3>"+
+        "<div class='muted' style='font-size:12px;margin-bottom:8px'>treinos por semana e o peso médio de <b>"+PESO_LAG_DIAS+" dias depois</b> — o peso responde com atraso</div>";
+  c.innerHTML=h;
+  const wrap=el("div");wrap.style.cssText="position:relative;height:280px";
+  const cv=el("canvas");cv.id="cLag";wrap.appendChild(cv);c.appendChild(wrap);
+  const pares=paresDefasagem(bm);
+  const n=el("div","muted");n.style.marginTop="6px";
+  n.innerHTML=pares.n+" semanas com treino e peso · <b>direção confiável, força não</b> · semanas de mais treino também costumam ser semanas de melhor alimentação"+
+    (pares.n<20?"<br>amostra pequena: a associação passada não vira previsão, e o cartão não projeta nenhuma":"");
+  c.appendChild(n);return c;
+}
+/* Fora da renderAnalise porque o chartAusente vive dentro dela; este é o mesmo card, em
+   função global, pro cartão de defasagem poder usá-lo. */
+function chartAusenteGlobal(title,key){const c=el("div","card");c.style.margin="0";c.classList.add("full");
+  c.innerHTML="<h3 style='margin:0 0 2px'>"+title+"</h3>"+
+    "<div class='empty' style='height:200px;display:flex;flex-direction:column;justify-content:center;padding:0'>"+
+    "<div class='ic'>📭</div><div>A chave <b>"+esc(key)+"</b> não veio neste <code>apple_health.json</code>.<br>"+
+    "Sem peso não há defasagem a medir.</div></div>";
+  return c;}
+function paresDefasagem(bm){
+  const tre={},pes={};
+  sessions.forEach(s=>{if(!s.date)return;const w=segundaDe(s.date);tre[w]=(tre[w]||0)+1;});
+  Object.keys(bm||{}).forEach(d=>{const w=segundaDe(d);(pes[w]=pes[w]||[]).push(bm[d]);});
+  const med={};for(const w in pes)med[w]=pes[w].reduce((a,b)=>a+b,0)/pes[w].length;
+  /* Mesmo corte dos cartões vizinhos (2025-11). Antes disso há duas semanas soltas de 2025 que
+     não descrevem este programa e sozinhas mudam o sinal da leitura. */
+  const semanas=[...new Set(Object.keys(tre).concat(Object.keys(med)))].sort().filter(w=>w>="2025-11-01");
+  const labels=[],tr=[],pw=[];let n=0;
+  semanas.forEach(w=>{
+    const t=tre[w]==null?null:tre[w];
+    const p=med[maisDias(w,PESO_LAG_DIAS)];
+    labels.push(w);tr.push(t);pw.push(p==null?null:Math.round(p*10)/10);
+    if(t!=null&&p!=null)n++;});
+  return {labels:labels,treinos:tr,peso:pw,n:n};
+}
+
+/* P6.2 — o pedido original era "os PRs atuais são de fevereiro: 8 exercícios com carga máxima
+   de seis meses atrás". O número diz outra coisa: refeito o cálculo, 25 dos 33 exercícios com
+   duas ou mais sessões fizeram a ÚLTIMA série já no próprio teto. Não é regressão, é
+   estagnação encostado no teto — que foi a conclusão da R6. E o modo de falha documentado dele
+   é desânimo (R2, queda de 3,6 → 1,9 treinos/semana): uma tela dizendo "seu pico é de seis
+   meses atrás" pra quem bateu o pico neste mês seria ativamente pior que não construir.
+   Por isso `no teto` é rótulo de elogio, empate conta como no teto (`>=`), e a única lista com
+   urgência é a dos 8 que têm o que recuperar.
+   É tabela e não <canvas> de propósito: o rótulo `no teto` precisa existir no innerText — num
+   gráfico ele seria pixel dentro do canvas e nenhum aceite conseguiria verificá-lo. */
+function cardTetoCarga(sess){
+  const c=el("div","card");c.style.margin="0";c.classList.add("full");
+  const falhou=readFailed(K.sess);
+  const m={};
+  sess.forEach(s=>s.exercises.forEach(e=>{
+    if(!(e.top>0))return;                       // sem carga não há teto: peso corporal fica fora
+    const o=m[e.name]||(m[e.name]={teto:0,ultima:0,quando:null,n:0});
+    o.n++;if(e.top>o.teto)o.teto=e.top;
+    o.ultima=e.top;o.quando=s.date;             // sess vem ordenado por data crescente
+  }));
+  const nomes=Object.keys(m);
+  const medidos=nomes.filter(n=>m[n].n>=2);     // uma sessão só: não há distância a medir
+  const unicos=nomes.length-medidos.length;
+  let h="<h3 style='margin:0 0 2px'>Teto de carga por exercício</h3>";
+  if(!medidos.length){
+    h+="<div class='empty' style='padding:24px 12px'><div class='ic'>🏔</div><div>"+
+       (falhou?"O histórico não pôde ser lido — <b>"+esc(falhou)+"</b>."
+              :"Nenhum exercício com carga em duas ou mais sessões ainda.<br>O teto aparece quando houver uma segunda sessão pra comparar.")+
+       "</div></div>";
+    c.innerHTML=h;return c;}
+  medidos.sort((a,b)=>{const ra=m[a].ultima/m[a].teto,rb=m[b].ultima/m[b].teto;
+    return (ra-rb)||(a<b?-1:1);});              // mais longe do teto primeiro
+  const noTeto=medidos.filter(n=>m[n].ultima>=m[n].teto).length;
+  const abaixo=medidos.length-noTeto;
+  h+="<div class='muted' style='font-size:12px;margin-bottom:8px'>"+
+     "<b>"+noTeto+" dos "+medidos.length+"</b> exercícios com duas ou mais sessões fizeram a última série no próprio teto · "+
+     abaixo+" est"+(abaixo===1?"á":"ão")+" abaixo dele"+
+     (unicos?" · "+unicos+(unicos===1?" exercício ficou de fora por ter uma sessão só":" exercícios ficaram de fora por terem uma sessão só")+" — não há distância a medir":"")+
+     "<br>barra = última carga · traço = maior carga já registrada · empate conta como <b>no teto</b></div>";
+  h+="<table style='width:100%;border-collapse:collapse;font-size:14px'>";
+  medidos.forEach(n=>{
+    const o=m[n],pct=Math.max(4,Math.round(100*o.ultima/o.teto));
+    const ok=o.ultima>=o.teto;
+    const cor=ok?"var(--accent)":"var(--warn)";
+    h+="<tr style='border-top:1px solid var(--border)'>"+
+       "<td style='padding:7px 10px 7px 0;white-space:nowrap'>"+esc(n)+"</td>"+
+       "<td style='width:40%'><div style='height:10px;border-radius:5px;background:var(--surface2);position:relative'>"+
+         "<div style='position:absolute;left:0;top:0;bottom:0;width:"+pct+"%;background:"+cor+";border-radius:5px'></div>"+
+         "<div style='position:absolute;right:0;top:-3px;bottom:-3px;width:2px;background:var(--text);opacity:.55'></div>"+
+       "</div></td>"+
+       "<td style='text-align:right;padding-left:10px;white-space:nowrap'><b>"+o.ultima+"</b><span class='muted'> / "+o.teto+" kg</span></td>"+
+       "<td style='text-align:right;padding-left:10px;white-space:nowrap'>"+
+         (ok?"<b style='color:var(--accent-tx)'>no teto</b>"
+            :"<span class='muted'>"+Math.round(100*(1-o.ultima/o.teto))+"% abaixo</span>")+"</td>"+
+       "<td style='text-align:right;color:var(--muted);padding-left:10px;white-space:nowrap'>"+fmtD(o.quando)+"</td></tr>";
+  });
+  h+="</table>";
+  if(falhou)h+="<div class='muted' style='margin-top:6px'>parte do histórico não pôde ser lida — "+esc(falhou)+"</div>";
+  c.innerHTML=h;return c;
+}
+
+/* P6.3 — o cartão que torna visível o aceite de resultado do P5.1, em vez de eu rodar a
+   medição à mão na R7. Cinco estados: sem pausa nenhuma (empty que ensina como se grava uma),
+   só pausas de antes do alarme (é o estado de hoje, e a tela DIZ que o depois ainda não
+   existe), as duas populações, erro de leitura do histórico, e o cheio.
+   A "linha da meta" que o recorte pedia não é desenhável: a meta é POR EXERCÍCIO e vale 0,
+   45, 60, 90, 120 ou 150 s (5/49/106/54/62/19 pausas). Uma linha única no eixo de segundos
+   seria uma média inventada. O fato que ela queria mostrar — quantas pausas passam da meta do
+   próprio exercício — vai em texto, comparando cada pausa com a SUA meta. */
+function cardDescanso(){
+  const c=el("div","card");c.style.margin="0";
+  const falhou=readFailed(K.sess);
+  const P=pausasRegistradas();
+  if(falhou&&!P.length){
+    c.innerHTML="<h3 style='margin:0 0 2px'>Distribuição de descanso</h3>"+
+      "<div class='empty' style='padding:24px 12px'><div class='ic'>⚠️</div><div>O histórico não pôde ser lido — <b>"+esc(falhou)+"</b>.<br>Nada foi apagado; ver Ajustes → Diagnóstico de dados.</div></div>";
+    return c;}
+  if(!P.length){
+    c.innerHTML="<h3 style='margin:0 0 2px'>Distribuição de descanso</h3>"+
+      "<div class='empty' style='padding:24px 12px'><div class='ic'>⏱</div><div>Nenhuma pausa registrada.<br>A pausa só é gravada quando o descanso passa por <b>▶ Descanso</b> → <b>🏁 Próxima</b>.</div></div>";
+    return c;}
+  const seg=P.map(p=>p.seg);
+  const med=Math.round(quantil(seg,.5)),p90=Math.round(quantil(seg,.9)),mx=Math.max.apply(null,seg);
+  const acima3=Math.round(100*seg.filter(v=>v>180).length/seg.length);
+  const comMeta=P.filter(p=>p.meta);
+  const passou=comMeta.filter(p=>p.seg>p.meta).length;
+  const depois=P.filter(p=>p.d>=ALARME_DESDE).length;
+  c.innerHTML="<h3 style='margin:0 0 2px'>Distribuição de descanso</h3>"+
+    "<div class='muted' style='font-size:12px;margin-bottom:8px'>"+seg.length+" pausas · mediana <b>"+med+"s</b> · p90 <b>"+p90+"s</b> · máx "+mx+"s · "+acima3+"% acima de 3 min</div>";
+  const wrap=el("div");wrap.style.cssText="position:relative;height:280px";
+  const cv=el("canvas");cv.id="cRest";wrap.appendChild(cv);c.appendChild(wrap);
+  const notas=[];
+  notas.push(depois
+    ? depois+(depois===1?" pausa registrada":" pausas registradas")+" desde o alarme (v1.6.1, "+ddmm(ALARME_DESDE)+") — o p90 e o máximo dessa série são a prova de que ele funcionou"
+    : "<b>Nenhuma pausa ainda desde o alarme</b> (v1.6.1, "+ddmm(ALARME_DESDE)+"): as "+seg.length+" são todas de treinos sem aviso sonoro. O antes-e-depois começa a existir no próximo treino.");
+  if(comMeta.length)notas.push(passou+" das "+comMeta.length+" pausas com meta definida passaram da meta do próprio exercício ("+Math.round(100*passou/comMeta.length)+"%) — a meta varia por exercício (0 a 150 s), por isso não há uma linha só no gráfico");
+  if(P.length<50)notas.push("amostra pequena: mediana e p90 se mexem muito abaixo de ~50 pausas");
+  const n=el("div","muted");n.style.marginTop="6px";n.innerHTML=notas.join("<br>");c.appendChild(n);
+  return c;
+}
+
 /* P1.8 — fronteira, não meta. Em 10 meses e 282 sessões não-força, nenhuma caminhada da
    janela do gráfico chegou a 145 de FC média; acima disso sobram Cycling real,
    StairClimbing e JumpRope. Zero deslocamento, sem nomear modalidade nenhuma — então não
@@ -1586,10 +1968,65 @@ function buildCharts(sess,H){
       mk("cExerc",{type:"bar",data:{labels:exk,datasets:[{label:"min/dia",data:exk.map(m=>Math.round(exm[m])),backgroundColor:"rgba(59,130,246,.55)"}]},options:{maintainAspectRatio:false,scales:{y:{title:{display:true,text:"min"}}}}});}
   }
 
+  /* P6.4 — dia da semana em hora LOCAL: new Date("2026-08-31") seria UTC e jogaria treino de
+     segunda-feira pro domingo. Mesmo parse manual do daysSince. */
+  {const dc=[0,0,0,0,0,0,0];
+   sess.forEach(s=>{const p=String(s.date).split("-");
+     const wd=new Date(+p[0],+p[1]-1,+p[2]).getDay();     // 0=dom
+     dc[(wd+6)%7]++;});                                    // 0=seg
+   mk("cDow",{type:"bar",data:{labels:["seg","ter","qua","qui","sex","sáb","dom"],
+     datasets:[{label:"sessões",data:dc,backgroundColor:"rgba(34,197,94,.5)"}]},
+     options:{maintainAspectRatio:false,plugins:{legend:{display:false}},
+       scales:{y:{min:0,ticks:{precision:0},title:{display:true,text:"nº de sessões"}}}}});}
+
+  /* P6.3 — duas populações no mesmo eixo: antes e desde o alarme. A faixa da mediana e a do
+     p90 ganham borda, que é o "marcado" possível sem plugin de anotação no Chart.js. */
+  {const P=pausasRegistradas();
+   if(P.length){
+     const antes=new Array(REST_BINS+1).fill(0),dep=new Array(REST_BINS+1).fill(0);
+     P.forEach(p=>{(p.d>=ALARME_DESDE?dep:antes)[restBin(p.seg)]++;});
+     const segs=P.map(p=>p.seg);
+     const bMed=restBin(quantil(segs,.5)),bP90=restBin(quantil(segs,.9));
+     const borda=i=>i===bMed?BLUE:(i===bP90?WARN:"transparent");
+     const temDep=dep.some(v=>v>0);
+     const ds=[{label:"antes do alarme",data:antes,backgroundColor:"rgba(34,197,94,.45)",
+                borderColor:antes.map((_,i)=>borda(i)),borderWidth:antes.map((_,i)=>borda(i)==="transparent"?0:2)}];
+     if(temDep)ds.push({label:"desde o alarme",data:dep,backgroundColor:"rgba(59,130,246,.75)"});
+     mk("cRest",{type:"bar",data:{labels:restLabels(),datasets:ds},
+       options:{maintainAspectRatio:false,
+         plugins:{tooltip:{callbacks:{title:it=>it[0].label+" s"}}},
+         scales:{x:{stacked:true,title:{display:true,text:"segundos de pausa · borda azul = mediana, âmbar = p90"}},
+                 y:{stacked:true,min:0,ticks:{precision:0},title:{display:true,text:"nº de pausas"}}}}});}}
+
   mk("cVolFreq",{data:{labels:tmonths,datasets:[
     {type:"bar",label:"Volume (kg·rep)",data:tmonths.map(m=>vol[m]),backgroundColor:"rgba(34,197,94,.5)",yAxisID:"y"},
     {type:"line",label:"Sessões",data:tmonths.map(m=>cnt[m]),borderColor:BLUE,backgroundColor:BLUE,yAxisID:"y1",tension:.25,borderWidth:2},
   ]},options:{maintainAspectRatio:false,scales:{y:{position:"left"},y1:{position:"right",grid:{drawOnChartArea:false},min:0}}}});
+
+  /* P6.7 — quatro séries categóricas precisam de quatro matizes distinguíveis; a paleta do
+     arquivo tem três e o RED, que aqui leria como alarme numa letra que ele treinou menos. O
+     violeta entra só como cor de série. */
+  {const meses=[...new Set(sess.map(s=>s.date.slice(0,7)))].sort();
+   const conta={};sess.forEach(s=>{const k=s.day+"|"+s.date.slice(0,7);(conta[k]=conta[k]||[]).push(s.vol);});
+   const COR={A:GREEN,B:BLUE,C:WARN,D:"#a78bfa"};
+   const ds=LETRAS.map(L=>({label:"Treino "+L,
+     data:meses.map(m=>{const a=conta[L+"|"+m];return a?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null;}),
+     borderColor:COR[L],backgroundColor:COR[L],tension:.25,borderWidth:2,pointRadius:3,spanGaps:false}));
+   mk("cVolLetra",{type:"line",data:{labels:meses,datasets:ds},
+     options:{maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
+       scales:{y:{min:0,title:{display:true,text:"kg·rep por sessão"}},x:{ticks:{maxTicksLimit:12}}}}});}
+
+  /* P6.1 — o deslocamento vai no EIXO, não só na legenda: um leitor que pegue o gráfico no meio
+     precisa ver que as duas séries não são do mesmo dia. */
+  if(H&&H.daily&&H.daily.BodyMass_kg){
+    const P=paresDefasagem(H.daily.BodyMass_kg);
+    mk("cLag",{data:{labels:P.labels,datasets:[
+      {type:"bar",label:"treinos na semana",data:P.treinos,backgroundColor:"rgba(34,197,94,.45)",yAxisID:"y"},
+      {type:"line",label:"peso médio (kg) — "+PESO_LAG_DIAS+" dias depois",data:P.peso,borderColor:WARN,backgroundColor:WARN,yAxisID:"y1",tension:.25,borderWidth:2,pointRadius:2,spanGaps:true},
+    ]},options:{maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
+      scales:{y:{position:"left",min:0,ticks:{precision:0},title:{display:true,text:"treinos na semana"}},
+              y1:{position:"right",grid:{drawOnChartArea:false},title:{display:true,text:"peso médio (kg) · "+PESO_LAG_DIAS+"d depois"}},
+              x:{ticks:{maxTicksLimit:12},title:{display:true,text:"semana do treino — o peso plotado é o de "+PESO_LAG_DIAS+" dias depois"}}}}});}
 
   // progressão + marcador de PR (quando bateu o recorde)
   const pts=[];sess.forEach(s=>{const e=s.exercises.find(x=>x.name===analProgEx);if(e&&e.top){const e1=Math.max(...e.sets.map(st=>st.w*(1+st.r/30)));pts.push({d:s.date,top:e.top,e1:Math.round(e1)});}});
@@ -1937,13 +2374,66 @@ function doImport(){
    continua em showMarkdown(), como cópia pra área de transferência. */
 
 /* ============ VERSÃO ============ */
-const APP_VERSION="1.9.0";
+const APP_VERSION="1.13.0";
 const APP_RELEASED="2026-08-31";
 /* Versionamento semântico MAJOR.MINOR.PATCH
    MAJOR = muda o formato dos dados (backup/restore incompatível)
    MINOR = funcionalidade nova, dados compatíveis
    PATCH = correção sem mudar comportamento                        */
 const APP_CHANGELOG=[
+ {v:"1.13.0",d:"2026-08-31",c:[
+   "Novo em Progressão: volume por letra (A/B/C/D), em média por sessão e por mês",
+   "Por sessão e não por mês: julho teve 13 sessões e agosto 9, e a soma faria julho parecer outro treino",
+   "O pedido era volume por grupo muscular, e o app não sabe o que é quadríceps — o split é a divisão muscular deste programa",
+   "Mês sem nenhuma sessão de uma letra interrompe a linha e é dito em texto: não treinar não é treinar leve",
+   "Novo em Resultado: treino × peso com o peso deslocado 14 dias, que é o atraso com que a balança responde",
+   "O deslocamento está escrito no eixo, não só na legenda",
+   "Nenhuma previsão na tela: o cartão mostra associação passada e não projeta perda de peso nenhuma",
+   "O confundidor vai no corpo do cartão: semana de mais treino costuma ser semana de melhor alimentação",
+   "Sem a chave BodyMass_kg o cartão diz qual chave faltou, em vez de desenhar eixo vazio",
+   "De carona: Histórico e Análise pararam de dizer 'sem treinos ainda' quando o histórico não pôde ser lido",
+   "Ilegível não é vazio — e a tela mandava importar por cima justamente no caso em que isso apagaria a cópia"]},
+ {v:"1.12.0",d:"2026-08-31",c:[
+   "Novo em Progressão: teto de carga por exercício, com a última carga e a maior já registrada",
+   "25 dos 33 exercícios com duas ou mais sessões fizeram a última série no próprio teto",
+   "Isso é sustentar o topo, não perder o pico: o rótulo é no teto, em verde, e não há alarme nenhum",
+   "Os 8 que estão abaixo aparecem primeiro, que é onde há o que recuperar",
+   "Empate com o teto conta como no teto: repetir a melhor carga é sustentar",
+   "8 exercícios com uma sessão só ficam de fora e a tela diz que ficaram — não há distância a medir",
+   "É tabela e não gráfico porque o rótulo precisa existir no texto da página, não em pixels"]},
+ {v:"1.11.0",d:"2026-08-31",c:[
+   "A aba Análise ganhou arquitetura: quatro seções na ordem em que a revisão pergunta",
+   "Eram 12 cartões soltos numa grade só; com as análises que faltam seriam 23, o que é o mesmo que zero",
+   "1 Aderência (ele foi?) · 2 Execução (o que aconteceu?) · 3 Progressão (está mais forte?) · 4 Resultado (o corpo mudou?)",
+   "A tabela de recordes saiu do fim da página e entrou em Progressão, ao lado do gráfico que ela explica",
+   "O aviso de Apple Health não carregado virou o estado vazio da seção que depende dele",
+   "Novo: sessões por dia da semana — sex 18 e ter 17 contra seg 10, onde o plano abre a semana",
+   "Novo: distribuição das 295 pausas registradas — mediana 104s, p90 171s, máx 455s, 8% acima de 3 min",
+   "O cartão de descanso separa antes e depois do alarme (v1.6.1) e diz que o depois ainda não existe",
+   "90% das pausas passam da meta do próprio exercício — a meta varia de 0 a 150s, então não há linha única no gráfico",
+   "Sem pausa registrada, o cartão ensina como se grava uma em vez de desenhar eixo vazio"]},
+ {v:"1.10.1",d:"2026-08-31",c:[
+   "A duração do treino parou de medir o tempo até o clique: 6614 min viraram 50",
+   "Duas sessões foram finalizadas no dia do treino seguinte e a Home exibia 1654 e 6614 min",
+   "Duração passa a ser o último evento real de série menos o início, quando o fecho veio 30 min depois",
+   "Série sem carimbo recebe o instante do fecho no salvamento: usar o maior t não corrigia nada (20,4% das séries)",
+   "O limiar de 30 min sai do dado: 17 de 19 gaps abaixo de 15 min, e nada entre 15 min e 1601 min",
+   "As outras 17 sessões com carimbo não mudam nem um minuto",
+   "A demora não some da tela: aparece 50 min · finalizada 5 dias depois, em cinza, sem alarme",
+   "Nada gravado muda — started, finished e os carimbos ficam como estão e o backup segue idêntico",
+   "A tela de fim de treino continua mostrando o intervalo bruto entre carimbos: ali o que vale é o que foi salvo"]},
+ {v:"1.10.0",d:"2026-08-31",c:[
+   "O teclado numérico parou de esconder o cronômetro, o 🏁 Próxima e o Parar",
+   "iOS não põe tecla de retorno em teclado numérico: não havia Pronto, e a barra ficava atrás dele",
+   "Com um campo em foco a barra da sessão sobe pra cima do teclado e continua tocável",
+   "Tocar em qualquer ponto do cartão do exercício, fora de campo e botão, fecha o teclado",
+   "Campo que ficaria coberto rola sozinho pra área visível — e só ele, sem solavanco nos outros",
+   "O Histórico parou de abrir sempre em Abdomen - máquina, o primeiro alfabético entre 45 nomes",
+   "Abre no exercício-chave (MVW) da sessão mais recente, e a escolha passa a sobreviver ao reload",
+   "Botões pequenos (✓, 🔍, + Série, ▶ Descanso, MD, 🏁 Próxima) foram de ~34px pra 44px de altura",
+   "Nome longo de exercício concluído para de espremer o resumo das séries: quem trunca é o nome",
+   "O pulso vermelho do descanso estourado respeita prefers-reduced-motion — para de piscar, não some",
+   "Sair da confirmação de treino pela barra de abas limpa o estado pendente em vez de deixá-lo pendurado"]},
  {v:"1.9.0",d:"2026-08-31",c:[
    "O campo RIR saiu da linha de série: 1 série preenchida em 1.465 (0,07%), contra 100% de repetições",
    "Eram três campos iguais e um terço da área de digitação nunca foi usado em dez meses",
@@ -2061,7 +2551,7 @@ const APP_CHANGELOG=[
 ];
 
 /* ============ BOOT ============ */
-requestPersist();applyTheme();
+requestPersist();applyTheme();trackKeyboard();
 if(active)wantScrollActive=true;   // P4.7: reload no meio do treino volta pro exercício do momento
 render();
 </script>
