@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -14,6 +14,11 @@
   --bg:#0b0f14; --surface:#141b24; --surface2:#1c2530; --border:#26313d;
   --text:#e6edf3; --muted:#8b97a6; --accent:#22c55e; --accent2:#3b82f6;
   --danger:#ef4444; --warn:#f59e0b; --radius:14px; --sp:8px;
+  /* P5.3 — as mesmas cores servem a dois papéis com regras diferentes: como FUNDO
+     (.btn-primary, a barra de descanso) não têm requisito de contraste contra a superfície;
+     como TEXTO precisam de 4,5:1 sobre ela. No escuro os dois valores coincidem, e é por
+     isso que o bug ficou dez meses invisível. No claro, não coincidem. */
+  --accent-tx:#22c55e; --warn-tx:#f59e0b; --danger-tx:#ef4444; --dn-tx:#fca5a5;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0}
@@ -34,10 +39,10 @@ button{font-family:inherit;font-size:15px;cursor:pointer;border:none;border-radi
 button:active{opacity:.6}
 button:disabled{opacity:.42;cursor:default}
 button:disabled:active{opacity:.42}
-.btn-primary{background:var(--accent)}
-.btn-blue{background:var(--accent2)}
+.btn-primary{background:var(--accent);color:#0b0f14;font-weight:600}   /* P5.5: #fff dava 2,28:1; escuro dá 8,43:1 */
+.btn-blue{background:var(--accent2);color:#0b0f14;font-weight:600}     /* P5.5: #fff dava 3,68:1; escuro dá 5,23:1 */
 .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
-.btn-danger{background:transparent;border:1px solid var(--danger);color:var(--danger)}
+.btn-danger{background:transparent;border:1px solid var(--danger-tx);color:var(--danger-tx)}
 .btn-sm{padding:8px 12px;font-size:13px}
 .row{display:flex;gap:10px;align-items:center}
 .row.wrap{flex-wrap:wrap}
@@ -45,37 +50,45 @@ button:disabled:active{opacity:.42}
 .grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px}
 input,select{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:9px;color:var(--text);padding:10px;font-size:16px;text-align:center}
 input:focus,select:focus{outline:2px solid var(--accent2);border-color:transparent}
+button:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}   /* P5.8 */
 label.fld{display:block;font-size:11px;color:var(--muted);text-align:center;margin-bottom:3px;text-transform:uppercase;letter-spacing:.4px}
 .tabbar{position:fixed;bottom:0;left:0;right:0;background:rgba(11,15,20,.92);backdrop-filter:blur(10px);border-top:1px solid var(--border);display:flex;padding:6px 6px calc(6px + env(safe-area-inset-bottom));z-index:50}
 .tabbar button{flex:1;background:none;color:var(--muted);font-size:11px;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0}
-.tabbar button.active{color:var(--accent)}
+.tabbar button.active{color:var(--accent-tx)}
 .tabbar .ic{font-size:20px}
 .daygrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.daycard{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;text-align:left}
-.daycard .big{font-size:32px;font-weight:750;color:var(--accent)}
+.daycard{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;text-align:left;color:var(--text)}
+.daycard .big{font-size:32px;font-weight:750;color:var(--accent-tx)}
 .ex{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px}
 .ex-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px}
 .ex-title{font-weight:650;font-size:15px}
 .exdone{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--radius);padding:13px 15px;margin-bottom:12px;cursor:pointer;transition:opacity .2s}
 .exdone:active{opacity:.6}
-.exdone .ck{color:var(--accent);font-weight:800;font-size:16px}
+.exdone .ck{color:var(--accent-tx);font-weight:800;font-size:16px}
 .exdone .nm{font-weight:650;font-size:15px}
 .exdone .sm{color:var(--muted);font-size:13px;margin-left:auto;text-align:right}
 .lastbox{background:var(--surface2);border-left:3px solid var(--accent);border-radius:8px;padding:9px 11px;margin-bottom:9px}
 .lastbox .hl{color:var(--text);font-weight:600;font-size:16px;margin-top:2px;line-height:1.35}
 .lastbox .lbl{font-size:10px;letter-spacing:.5px;color:var(--muted)}
 .trend{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:20px;margin-left:6px;vertical-align:middle}
-.trend.up{background:rgba(34,197,94,.16);color:var(--accent)}
-.trend.dn{background:rgba(239,68,68,.16);color:#fca5a5}
+.trend.up{background:rgba(34,197,94,.16);color:var(--accent-tx)}
+.trend.dn{background:rgba(239,68,68,.16);color:var(--dn-tx)}
 .trend.eq{background:var(--surface);color:var(--muted)}
 .histrow{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:baseline;padding:6px 0;border-top:1px solid var(--border);font-size:13px}
 .histrow .hd{color:var(--muted);white-space:nowrap}
 .histrow .hs{text-align:right}
 .tag{display:inline-block;font-size:10px;padding:2px 6px;border-radius:6px;background:var(--surface2);color:var(--muted);margin-left:6px;vertical-align:middle}
-.tag.mvw{background:rgba(245,158,11,.15);color:var(--warn)}
-.setrow{display:grid;grid-template-columns:26px 1fr 1fr 1fr 34px;gap:8px;align-items:center;margin-bottom:8px}
+.tag.mvw{background:rgba(245,158,11,.15);color:var(--warn-tx)}
+/* P5.13 — eram TRÊS campos iguais e um terço da área nunca foi usado: 1 série de 1.465
+   (0,07%) tem RIR, contra 100% de repetições. Com a coluna fora, kg e reps ganham ~50% de
+   largura cada na linha que ele preenche ~18 vezes por treino, em pé, com uma mão.
+   A chave `rir` continua no formato salvo — ver o README da v1.9.0.
+   P5.2/P5.9 de carona: o `×` era um alvo de ~30×34 px na mesma linha. Vai a 44×44, que é o
+   mínimo da Apple, sem custar largura de campo — a coluna cresce 10 px e os campos ganham
+   os 34 px do RIR de volta. */
+.setrow{display:grid;grid-template-columns:26px 1fr 1fr 44px;gap:8px;align-items:center;margin-bottom:8px}
 .setrow .idx{color:var(--muted);text-align:center;font-size:13px}
-.setrow .del{background:none;color:var(--muted);padding:4px;font-size:16px}
+.setrow .del{background:none;color:var(--muted);padding:4px;font-size:16px;min-height:44px;width:100%}
 .pill{display:inline-block;padding:3px 8px;border-radius:20px;background:var(--surface2);font-size:12px;color:var(--muted);margin:2px 4px 2px 0}
 .sessionbar{position:fixed;left:0;right:0;bottom:calc(66px + env(safe-area-inset-bottom));z-index:45;display:none;padding:0 12px;pointer-events:none}
 .sessionbar.on{display:block}
@@ -91,7 +104,7 @@ label.fld{display:block;font-size:11px;color:var(--muted);text-align:center;marg
 .sessionbar.resting.over .sb-inner{background:var(--danger);animation:pulseOver 1s ease-in-out infinite}
 @keyframes pulseOver{0%,100%{box-shadow:0 6px 22px rgba(239,68,68,.5)}50%{box-shadow:0 6px 30px rgba(239,68,68,.85)}}
 .ex.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 4px 16px rgba(34,197,94,.12)}
-.ex.active .ex-title::before{content:"▶ ";color:var(--accent);font-size:12px}
+.ex.active .ex-title::before{content:"▶ ";color:var(--accent-tx);font-size:12px}
 .sess{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--border)}
 .sess:last-child{border-bottom:none}
 .dot{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;background:var(--surface2)}
@@ -103,11 +116,14 @@ canvas{width:100%;height:auto;display:block}
 textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:9px;color:var(--text);padding:10px;font-size:13px;font-family:ui-monospace,monospace;min-height:200px;text-align:left}
 .seg{display:flex;background:var(--surface2);border-radius:10px;padding:3px;gap:3px;margin-bottom:12px}
 .seg button{flex:1;background:none;color:var(--muted);padding:8px;font-size:13px}
-.seg button.active{background:var(--accent);color:#fff}
+.seg button.active{background:var(--accent);color:#0b0f14;font-weight:600}
 hr{border:none;border-top:1px solid var(--border);margin:14px 0}
 a{color:var(--accent2)}
 /* tema claro */
-body.light{--bg:#f4f6f9;--surface:#ffffff;--surface2:#eef2f7;--border:#d5dde6;--text:#17202a;--muted:#5c6b7a}
+body.light{--bg:#f4f6f9;--surface:#ffffff;--surface2:#eef2f7;--border:#d5dde6;--text:#17202a;--muted:#5c6b7a;
+  /* medidos sobre #ffffff / #eef2f7 e sobre os fundos tingidos de .trend e .tag.mvw:
+     accent 7,13 / 6,34 / 6,23 · warn 7,09 / 6,31 / 6,31 · danger 6,47 / 5,76 / 5,24 */
+  --accent-tx:#166534;--warn-tx:#92400e;--danger-tx:#b91c1c;--dn-tx:#b91c1c}
 body.light .tabbar{background:rgba(255,255,255,.92)}
 /* modo largo (aba análise no desktop) */
 body.wide .wrap{max-width:1180px}
@@ -223,6 +239,13 @@ function validateSession(s){
   if(!sets)erros.push("nenhuma série registrada");
   else if(!comReps)erros.push("as "+sets+" séries estão todas sem repetições");
   if(s.started&&s.finished&&s.finished<s.started)erros.push("término anterior ao início");
+  /* P1.10 — "Finalizar com o que tem" carimba `finished` no dia em que ele lembrou, não no
+     fim do treino: a duração resultante é verdadeira (é a diferença dos carimbos) e não é
+     tempo de treino. Aviso, não erro — grava, mas não deixa passar calado um
+     "DURAÇÃO 6612 min" na tela que existe pra mostrar o conteúdo real. 12 h nunca dispara
+     num treino: a sessão mais longa do histórico tem 1h20. */
+  if(s.started&&s.finished&&(s.finished-s.started)>12*36e5)
+    avisos.push("finalizada "+Math.round((s.finished-s.started)/36e5)+" h depois de iniciada — a duração registrada é o intervalo entre os carimbos, não o tempo de treino");
   return{erros:erros,avisos:avisos,stats:{exercicios:(s.exercises||[]).length,sets:sets,
     comReps:comReps,comCarga:comCarga,vol:Math.round(vol),
     dur:(s.started&&s.finished)?Math.round((s.finished-s.started)/60000):null}};
@@ -295,7 +318,10 @@ let cfg       = load(K.cfg, {ciclo:"C4", plano:"ABCD", musicUrl:""});
 const GOALS_DEFAULT={weight:[81,83], fat:[15,17], lean:66}; // metas de recomposição
 function goals(){return cfg.goals||GOALS_DEFAULT;}
 function applyTheme(){document.body.classList.toggle("light",cfg.theme==="light");}
-let tab = active ? "log" : "home";
+/* P1.10 — sessão de OUTRO dia não abre no log: abrir direto em "Treino D" um treino de dez
+   dias atrás é a mesma mentira que o card da Home passou a não contar. Órfã cai na Home,
+   que é onde está o aviso e os dois botões. Sessão de hoje continua abrindo no log. */
+let tab = (active && !isOrfa()) ? "log" : "home";
 
 /* ============ HELPERS ============ */
 const $ = s=>document.querySelector(s);
@@ -358,7 +384,7 @@ function markLap(){const sec=Math.round((Date.now()-swStart)/1000);
   if(e){active.ultimoExercicioId=e.id;active.ultimoSetAt=Date.now();
     if(e.sets.length){const ls=e.sets[e.sets.length-1];ls.rest=sec;ls.t=Date.now();}
     if(targetSets(e)&&completedSets(e)>=targetSets(e)){e.done=true;e.open=false;} // alvo atingido → conclui exercício
-    else{const last=e.sets[e.sets.length-1]||{};e.sets.push({w:last.w||"",r:last.r||"",rir:last.rir||""});}
+    else{const last=e.sets[e.sets.length-1]||{};e.sets.push({w:last.w||"",r:last.r||""});}
     persistActive();}
   stopRest();render();
   toast(sec+"s registrado");}
@@ -452,16 +478,57 @@ function render(){renderTabs();const a=$("#app");a.innerHTML="";
 }
 
 /* ---------- HOME ---------- */
+/* ---------- P1.10: a sessão órfã ---------- */
+/* Uma sessão iniciada e não finalizada vive só em K.active. O backup é
+   JSON.stringify({templates,sessions,cfg}) — `active` NÃO entra, e por decisão de produto
+   continua não entrando (carregá-la faria o restore ressuscitar um fantasma e envenenaria
+   sessVol, o contador da semana e o refSessionFor). O problema nunca foi o backup não
+   levar: é ela ficar órfã sem ninguém avisar. Então o conserto é de apresentação, nas
+   duas telas onde ele já olha — a Home e o bloco de backup.
+   Critério é a data, não aritmética de horas: ele não treina atravessando a meia-noite. */
+function isOrfa(){return !!(active&&active.date&&active.date!==today());}
+function ddmm(d){const p=String(d||"").split("-");return p.length===3?p[2]+"/"+p[1]:String(d||"");}
+
 function renderHome(a){
   a.appendChild(el("div","row",""+
     "<div style='flex:1'><h1>Treino</h1><div class='muted'>Ciclo "+esc(cfg.ciclo)+" · Plano "+esc(cfg.plano)+"</div></div>"));
-  if(active){
+  const actFail=readFailed(K.active);
+  if(actFail&&!active){                              // cicatriz nº 1: não some, diz por quê
     const c=el("div","card");
-    c.style.borderColor="var(--accent)";
-    c.innerHTML="<div class='muted'>Sessão em andamento</div><h2 style='margin:4px 0'>Treino "+active.day+" — "+esc(templates[active.day].name)+"</h2>";
-    const b=el("button","btn-primary","Continuar treino →");b.style.width="100%";
-    b.onclick=()=>{wantScrollActive=true;go("log");};
+    c.style.borderColor="var(--danger-tx)";
+    c.innerHTML="<div style='font-weight:700;color:var(--danger-tx)'>Há uma sessão gravada que não pôde ser lida</div>"+
+      "<div class='muted' style='margin-top:4px'>"+esc(actFail)+". Nada foi apagado.</div>";
+    const b=el("button","btn-ghost","Ver Ajustes → Diagnóstico de dados");b.style.width="100%";b.style.marginTop="10px";
+    b.onclick=()=>go("cfg");
     c.appendChild(b);a.appendChild(c);
+  }
+  if(active){
+    const orfa=isOrfa();
+    const c=el("div","card");
+    c.style.borderColor=orfa?"var(--warn-tx)":"var(--accent)";
+    const nome=templates[active.day]?templates[active.day].name:active.day;
+    c.innerHTML="<div class='muted'>"+(orfa
+        ? "<b style='color:var(--warn-tx)'>Sessão não finalizada · iniciada em "+esc(ddmm(active.date))+"</b>"
+        : "Sessão em andamento")+
+      "</div><h2 style='margin:4px 0'>Treino "+esc(active.day)+" — "+esc(nome)+"</h2>";
+    if(orfa){
+      /* `Continuar treino →` some: continuar é o que ele não vai fazer num treino de dias
+         atrás. finishSession() já descarta série em branco e exercício sem série, e
+         validateSession() já barra com erro nomeado quando não sobrou nada — se não houver
+         nada válido, isto cai na tela `save` em estado de erro, que já existe. */
+      c.appendChild(el("div","muted","Ela não entra no backup e não chega ao vault enquanto não for finalizada."));
+      const f=el("button","btn-primary","Finalizar com o que tem");f.style.width="100%";f.style.marginTop="10px";
+      f.onclick=finishSession;
+      const d=el("button","btn-danger","Descartar");d.style.width="100%";d.style.marginTop="8px";
+      d.onclick=()=>{if(confirm("Descartar este treino? Os dados não serão salvos."))
+        {active=null;localStorage.removeItem(K.active);go("home");}};
+      c.appendChild(f);c.appendChild(d);
+    }else{
+      const b=el("button","btn-primary","Continuar treino →");b.style.width="100%";
+      b.onclick=()=>{wantScrollActive=true;go("log");};
+      c.appendChild(b);
+    }
+    a.appendChild(c);
   }
   a.appendChild(weekBox());
 
@@ -497,7 +564,7 @@ function renderHome(a){
       const txt=n===null?"nunca treinado":n===0?"hoje":n===1?"ontem":"há "+n+" dias";
       const alerta=n!==null&&n>DIAS_ALERTA;   // 4 letras ÷ 3 sessões/semana = ciclo de 9,3 dias
       sel="<div class='muted' style='margin-top:4px'>"+
-          (alerta?"<b style='color:var(--warn)'>"+txt+"</b>":txt)+"</div>";
+          (alerta?"<b style='color:var(--warn-tx)'>"+txt+"</b>":txt)+"</div>";
     }
     card.innerHTML="<div class='big'>"+d+"</div><div style='font-weight:600;margin:2px 0'>"+esc(t.name)+"</div>"+
       "<div class='muted'>"+t.ex.length+" exercícios</div>"+sel;
@@ -616,7 +683,7 @@ function renderLog(a){
   head.appendChild(music);
   a.appendChild(head);
 
-  a.appendChild(el("div","muted","Preencha a série → <b>▶ Descanso</b> conta a pausa → <b>🏁 Próxima</b> grava a pausa e cria a próxima. <b>RIR</b> = reps em reserva. 🔍 mostra o exercício. O tempo total fica sempre na barra de baixo."));
+  a.appendChild(el("div","muted","Preencha a série → <b>▶ Descanso</b> conta a pausa → <b>🏁 Próxima</b> grava a pausa e cria a próxima. 🔍 mostra o exercício. O tempo total fica sempre na barra de baixo."));
 
   // feitos vão pro fim da lista (ordem estável)
   const order=active.exercises.map((e,i)=>i).sort((x,y)=>(active.exercises[x].done?1:0)-(active.exercises[y].done?1:0));
@@ -793,7 +860,7 @@ function exCard(e,ei,isActive){
   const head=el("div","ex-head");
   head.innerHTML="<div><span class='ex-title'>"+esc(e.n)+"</span>"+(e.mvw?"<span class='tag mvw'>🔑 MVW</span>":"")+
     (e.done?(pulado?"<span class='tag' style='background:rgba(148,163,184,.15);color:var(--muted)'>↷ pulado</span>"
-                   :"<span class='tag' style='background:rgba(34,197,94,.15);color:var(--accent)'>✓ feito</span>"):"")+
+                   :"<span class='tag' style='background:rgba(34,197,94,.15);color:var(--accent-tx)'>✓ feito</span>"):"")+
     "<div class='muted'>alvo "+esc(e.sr)+" · desc "+e.rest+"s</div></div>";
   const doneBtn=el("button","btn-ghost btn-sm",e.done?"▴":"✓");doneBtn.title=e.done?"Recolher":"Marcar como feito";doneBtn.style.flex="0 0 auto";
   doneBtn.onclick=()=>{e.done=true;e.open=false;persistActive();render();};
@@ -832,8 +899,7 @@ function exCard(e,ei,isActive){
     r.appendChild(el("div","idx",(si+1)));
     const w=inp(s.w,"kg",v=>{s.w=v;persistActive();updVol(c);});
     const rp=inp(s.r,"reps",v=>{s.r=v;touchSet(e,s);persistActive();updVol(c);});
-    const ri=inp(s.rir,"RIR",v=>{s.rir=v;persistActive();});
-    r.appendChild(w);r.appendChild(rp);r.appendChild(ri);
+    r.appendChild(w);r.appendChild(rp);
     const d=el("button","del","×");d.onclick=()=>{e.sets.splice(si,1);persistActive();render();};
     r.appendChild(d);
     c.appendChild(r);
@@ -847,7 +913,7 @@ function exCard(e,ei,isActive){
   const bar=el("div","row");bar.style.marginTop="6px";
   const reached=targetSets(e)&&completedSets(e)>=targetSets(e);
   const add=el("button","btn-ghost btn-sm",reached?"+ Série extra":"+ Série");
-  add.onclick=()=>{const last=e.sets[e.sets.length-1]||{};e.sets.push({w:last.w||"",r:last.r||"",rir:last.rir||""});e.done=false;persistActive();render();};
+  add.onclick=()=>{const last=e.sets[e.sets.length-1]||{};e.sets.push({w:last.w||"",r:last.r||""});e.done=false;persistActive();render();};
   /* P5.1 — este toque é o gesto do usuário que o iOS exige pra liberar o áudio, e é o
      mesmo toque que inicia a contagem. Sem isto o alarme do fim do descanso não toca. */
   const rest=el("button","btn-blue btn-sm","▶ Descanso");rest.onclick=()=>{armAudio();startRest(ei);};
@@ -916,12 +982,12 @@ function renderSave(a){
     "</h1><div class='muted'>Treino "+esc(sess.day)+" · "+esc(sess.date)+"</div></div>"));
 
   const st=el("div","card");
-  st.style.borderColor=ok?"var(--accent)":"var(--danger)";
+  st.style.borderColor=ok?"var(--accent)":"var(--danger-tx)";
   if(ok){
-    st.innerHTML="<div style='font-weight:700;color:var(--accent)'>✓ Gravado e conferido por releitura</div>"+
+    st.innerHTML="<div style='font-weight:700;color:var(--accent-tx)'>✓ Gravado e conferido por releitura</div>"+
       "<div class='muted' style='margin-top:4px'>O armazenamento devolveu <b>"+res.total+"</b> treinos no histórico.</div>";
   }else{
-    st.innerHTML="<div style='font-weight:700;color:var(--danger)'>✕ "+
+    st.innerHTML="<div style='font-weight:700;color:var(--danger-tx)'>✕ "+
       esc(res?res.msg:"Sessão incompleta — nada foi gravado")+"</div>"+
       (v.erros.length?"<ul style='margin:8px 0 0 18px;padding:0'>"+
         v.erros.map(x=>"<li>"+esc(x)+"</li>").join("")+"</ul>":"");
@@ -929,8 +995,8 @@ function renderSave(a){
   a.appendChild(st);
 
   if(v.avisos.length){
-    const w=el("div","card");w.style.borderColor="var(--warn)";
-    w.innerHTML="<div style='font-weight:650;color:var(--warn)'>Avisos</div>"+
+    const w=el("div","card");w.style.borderColor="var(--warn-tx)";
+    w.innerHTML="<div style='font-weight:650;color:var(--warn-tx)'>Avisos</div>"+
       "<ul style='margin:8px 0 0 18px;padding:0'>"+v.avisos.map(x=>"<li>"+esc(x)+"</li>").join("")+"</ul>";
     a.appendChild(w);
   }
@@ -996,6 +1062,18 @@ let bkState={phase:"idle"};   // idle | busy | done | abort | fail
 function renderBackupBlock(host){
   host.innerHTML="";
   const st=backupStats(), S=bkState;
+  /* P1.10 — cicatriz nº 2 aplicada ao lugar certo: a confirmação mostra o conteúdo real
+     E o que não é conteúdo. O bloco anunciava "81 treinos · 1465 séries" com a mesma
+     confiança havendo ou não uma sessão pendurada fora do payload. */
+  if(isOrfa()){
+    const w=el("div","muted");
+    w.style.cssText="color:var(--warn-tx);margin-bottom:10px";
+    w.innerHTML="⚠ <b>1 sessão não finalizada ("+esc(active.day)+" · "+esc(ddmm(active.date))+
+      ") não entra neste backup.</b> Finalize ou descarte na Home antes de exportar.";
+    const g=el("button","btn-ghost btn-sm","Ir pra Home");g.style.marginBottom="10px";
+    g.onclick=()=>go("home");
+    host.appendChild(w);host.appendChild(g);
+  }
   const b=el("button","btn-primary","⬇ Backup pro vault");
   b.style.width="100%";
 
@@ -1018,7 +1096,7 @@ function renderBackupBlock(host){
       "Não toque de novo enquanto isso: o segundo toque exporta um arquivo duplicado."));
   }else if(S.phase==="done"){                        // CHEIO — o que saiu de fato
     const d=el("div");d.style.cssText="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)";
-    d.innerHTML="<div style='font-weight:700;color:var(--accent)'>✓ "+
+    d.innerHTML="<div style='font-weight:700;color:var(--accent-tx)'>✓ "+
         (S.via==="share"?"Entregue ao compartilhamento":"Baixado")+" às "+esc(S.hora)+"</div>"+
       "<div style='margin-top:4px;font-variant-numeric:tabular-nums'><b>"+S.treinos+"</b> "+
         (S.treinos===1?"treino":"treinos")+" · <b>"+S.sets+"</b> "+(S.sets===1?"série":"séries")+
@@ -1026,7 +1104,7 @@ function renderBackupBlock(host){
       "<div class='muted' style='margin-top:2px'><code>"+esc(S.fn)+"</code></div>"+
       "<div class='muted' style='margin-top:6px'>Salve em <b>iCloud Drive</b> — a raiz serve. "+
         "O app entrega o arquivo ao iOS e não enxerga onde ele parou: confira em <b>Arquivos</b>.</div>"+
-      (S.cfgOk?"":"<div style='margin-top:6px;color:var(--warn);font-weight:650'>⚠ O arquivo saiu, "+
+      (S.cfgOk?"":"<div style='margin-top:6px;color:var(--warn-tx);font-weight:650'>⚠ O arquivo saiu, "+
         "mas a data do último backup não pôde ser gravada — veja Ajustes → Diagnóstico de dados.</div>");
     host.appendChild(d);
   }else if(S.phase==="abort"){                       // CANCELADO — não é erro
@@ -1037,7 +1115,7 @@ function renderBackupBlock(host){
     host.appendChild(d);
   }else if(S.phase==="fail"){                        // ERRO — motivo visível
     const d=el("div");d.style.cssText="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)";
-    d.innerHTML="<div style='font-weight:700;color:var(--danger)'>✕ O backup não saiu ("+esc(S.hora)+")</div>"+
+    d.innerHTML="<div style='font-weight:700;color:var(--danger-tx)'>✕ O backup não saiu ("+esc(S.hora)+")</div>"+
       "<div class='muted' style='margin-top:2px'>Motivo: "+esc(S.msg)+"</div>"+
       "<div class='muted' style='margin-top:4px'>O histórico não foi tocado. Registrado em "+
       "Ajustes → Diagnóstico de dados → Log de gravações.</div>";
@@ -1267,10 +1345,10 @@ function renderAnalise(a){
     +kpi("Volume total",Math.round(sess.reduce((a,s)=>a+s.vol,0)/1000)+"k","kg·rep");
   if(H){const bm=H.daily.BodyMass_kg||{},bf=bfPct(H.daily.BodyFatPercentage),lm=H.daily.LeanBodyMass_kg||{};
     const lw=latestVal(bm),lf=latestVal(bf),ll=latestVal(lm);const g=goals();
-    const gTxt=(v,range,unit)=>{if(v==null)return"";const[lo,hi]=range;if(v>=lo&&v<=hi)return "<b style='color:var(--accent)'>🎯 na meta</b>";const falta=r1(v>hi?v-hi:lo-v);return "meta "+lo+"–"+hi+unit+" · falta "+falta+unit;};
+    const gTxt=(v,range,unit)=>{if(v==null)return"";const[lo,hi]=range;if(v>=lo&&v<=hi)return "<b style='color:var(--accent-tx)'>🎯 na meta</b>";const falta=r1(v>hi?v-hi:lo-v);return "meta "+lo+"–"+hi+unit+" · falta "+falta+unit;};
     html+=kpi("Peso",r1(lw&&lw.v)+" kg",arrow(lw&&lw.v-valAgo(bm,90),false)+" · "+gTxt(lw&&lw.v,g.weight,"kg"))
       +kpi("Gordura",r1(lf&&lf.v)+"%",arrow(lf&&lf.v-valAgo(bf,90),false)+" · "+gTxt(lf&&lf.v,g.fat,"%"))
-      +kpi("Massa magra",r1(ll&&ll.v)+" kg",arrow(ll&&ll.v-valAgo(lm,90),true)+" · "+((ll&&ll.v>=g.lean)?"<b style='color:var(--accent)'>🎯 ≥"+g.lean+"</b>":"meta ≥"+g.lean+"kg"))
+      +kpi("Massa magra",r1(ll&&ll.v)+" kg",arrow(ll&&ll.v-valAgo(lm,90),true)+" · "+((ll&&ll.v>=g.lean)?"<b style='color:var(--accent-tx)'>🎯 ≥"+g.lean+"</b>":"meta ≥"+g.lean+"kg"))
       +kpi("VO2 Max",r1(latestVal(H.daily.VO2Max||{})&&latestVal(H.daily.VO2Max).v),"")
       +kpi("FC rep (30d)",r1(avgWin(H.daily.RestingHeartRate_bpm,30))+" bpm","")
       +kpi("HRV (30d)",r1(avgWin(H.daily.HRV_SDNN_ms,30))+" ms","");
@@ -1299,7 +1377,7 @@ function renderAnalise(a){
   if(cfg.planMeta&&cfg.planMeta.start){const s0=new Date(cfg.planMeta.start),w0=cfg.planMeta.weeks||52;const e0=new Date(s0.getTime()+w0*7*864e5);const now=new Date();const wkTot=Math.floor((now-s0)/864e5/7)+1;
     ptxt+="<div class='muted' style='margin-top:2px'>Plano geral: início "+fmtD(cfg.planMeta.start)+" · "+w0+" sem · semana <b>"+wkTot+"</b> · término previsto <b>"+fmtD(e0.toISOString().slice(0,10))+"</b></div>";}
   if(pstart){const sd=new Date(pstart),now=new Date();const wkNow=Math.floor((now-sd)/864e5/7)+1;const end=new Date(sd.getTime()+wks*7*864e5);const dend=Math.round((end-now)/864e5);
-    ptxt+="<div class='muted' style='margin-top:2px'>Ciclo atual: semana <b>"+wkNow+"</b> de "+wks+" · começou "+fmtD(pstart)+" · término previsto <b>"+fmtD(end.toISOString().slice(0,10))+"</b> "+(dend>=0?"(faltam "+dend+"d)":"<b style='color:var(--warn)'>(estendido "+(-dend)+"d)</b>")+"</div>";}
+    ptxt+="<div class='muted' style='margin-top:2px'>Ciclo atual: semana <b>"+wkNow+"</b> de "+wks+" · começou "+fmtD(pstart)+" · término previsto <b>"+fmtD(end.toISOString().slice(0,10))+"</b> "+(dend>=0?"(faltam "+dend+"d)":"<b style='color:var(--warn-tx)'>(estendido "+(-dend)+"d)</b>")+"</div>";}
   else ptxt+="<div class='muted' style='margin-top:2px'>Defina o início do ciclo para ver semana atual e término.</div>";
   // histórico de ciclos/trocas
   if(hist.length){ptxt+="<div style='margin-top:8px'><table style='width:100%;border-collapse:collapse;font-size:13px'><tr class='muted'><td>Ciclo</td><td>Início</td><td>Duração</td><td>Plano / nota</td></tr>";
@@ -1342,7 +1420,15 @@ function renderAnalise(a){
   pc.innerHTML="<h3 style='margin:0 0 6px'>Progressão por exercício</h3>";pc.appendChild(sel);
   const pw=el("div");pw.style.cssText="position:relative;height:240px";const pcv=el("canvas");pcv.id="cProg";pw.appendChild(pcv);pc.appendChild(pw);
   grid.appendChild(pc);
-  if(H){grid.appendChild(chartCard("Cardio (min/mês)","cCardio","Treinos de cardio registrados no Apple Watch"));
+  if(H){
+    /* P1.8 — o rótulo nomeia FONTE e FILTRO, nunca virtude. "Cardio" afirmava que o que
+       estava ali era treino; contava 834 min de caminhada de deslocamento em agosto (FC
+       média 100) e marcava 1.030 min contra uma meta de 216. O título carrega o próprio
+       critério: não consegue mentir sem que mudar a mentira exija mudar o título. */
+    const cardioSub="sessões do Apple Watch com FC média ≥ "+FC_ESFORCO+" bpm · exclui deslocamento a pé e de bike";
+    grid.appendChild((H.workouts&&H.workouts.length)
+      ? chartCard("Esforço (min/mês · FC ≥ "+FC_ESFORCO+")","cCardio",cardioSub)
+      : chartAusente("Esforço (min/mês · FC ≥ "+FC_ESFORCO+")","workouts"));
     /* "meta 8.000/dia" saiu: 8k é referência geral de saúde, não está no plano do vault,
        e ele anda 13,6 mil. Meta que ninguém decidiu é o 216 do cardio em escala menor. */
     grid.appendChild(H.daily.Steps
@@ -1365,13 +1451,30 @@ function renderAnalise(a){
   let prh="<div class='row' style='justify-content:space-between'><h3 style='margin:0'>Recordes (PR) — quando bati</h3><span class='muted' style='font-size:12px'>🟢 = PR nos últimos 45 dias</span></div>"+
     "<table style='width:100%;border-collapse:collapse;font-size:14px;margin-top:6px'>";
   rows.forEach(r=>{const isRecent=lastDate&&(new Date(lastDate)-new Date(r.date))/864e5<=45;
-    prh+="<tr style='border-top:1px solid var(--border)'><td style='padding:7px 0'>"+(isRecent?"🟢 ":"")+esc(r.n)+"</td><td style='text-align:right;font-weight:700"+(isRecent?";color:var(--accent)":"")+"'>"+r.top+" kg</td><td style='text-align:right;color:var(--muted);padding-left:10px;white-space:nowrap'>"+fmtD(r.date)+"</td></tr>";});
+    prh+="<tr style='border-top:1px solid var(--border)'><td style='padding:7px 0'>"+(isRecent?"🟢 ":"")+esc(r.n)+"</td><td style='text-align:right;font-weight:700"+(isRecent?";color:var(--accent-tx)":"")+"'>"+r.top+" kg</td><td style='text-align:right;color:var(--muted);padding-left:10px;white-space:nowrap'>"+fmtD(r.date)+"</td></tr>";});
   prh+="</table>";prc.innerHTML=prh;a.appendChild(prc);
   a.appendChild(el("div",null,"<div style='height:40px'></div>"));
 
   // renderiza gráficos
   ensureChart(()=>buildCharts(sess,H));
 }
+/* P1.8 — fronteira, não meta. Em 10 meses e 282 sessões não-força, nenhuma caminhada da
+   janela do gráfico chegou a 145 de FC média; acima disso sobram Cycling real,
+   StairClimbing e JumpRope. Zero deslocamento, sem nomear modalidade nenhuma — então não
+   quebra quando ele trocar de aparelho. O número vive AQUI e é interpolado no título: o dia
+   em que o critério deixar de servir, está escrito na tela onde ele olha. */
+const FC_ESFORCO=145;
+function hrMedia(w){const s=(w&&w.stats&&w.stats.HeartRate)||null;return s&&typeof s.avg==="number"?s.avg:null;}
+/* Até onde o export foi. Um export de 12/09 desenha setembro como colapso se ninguém disser
+   que o mês não acabou. Reaproveitável por qualquer gráfico mensal desta aba. */
+function exportAte(H){let mx=null;
+  Object.keys((H&&H.daily)||{}).forEach(k=>{const o=H.daily[k]||{};
+    Object.keys(o).forEach(d=>{if(!mx||d>mx)mx=d;});});
+  return mx;}
+function mesIncompleto(mes,ate){                       // "2026-09" vs "2026-09-12"
+  if(!ate||!mes||ate.slice(0,7)!==mes)return false;
+  const p=mes.split("-"),ultimo=new Date(+p[0],+p[1],0).getDate();
+  return +ate.slice(8,10)<ultimo;}
 function buildCharts(sess,H){
   if(!window.Chart)return;
   const cs=getComputedStyle(document.body);
@@ -1431,19 +1534,46 @@ function buildCharts(sess,H){
     const sm=moAvg(H.sleep_hours_by_night||{});const smk=Object.keys(sm).sort().filter(m=>m>="2025-11");
     mk("cSleep",{type:"bar",data:{labels:smk,datasets:[{label:"h/noite",data:smk.map(m=>sm[m]),backgroundColor:"rgba(59,130,246,.55)"}]},options:{maintainAspectRatio:false,scales:{y:{title:{display:true,text:"h"}}}}});
 
-    // cardio (min/mês) por tipo, do Apple Watch
-    const CARDIO=["Walking","Cycling","Running","IndoorCycle","Elliptical","HIIT","StairClimbing"];
-    /* v1.4.1: StairClimbing entrou — é a cardio preferida do plano (stair stepper) e ficou
-       154 min de jul/26 e 186 min de ago/26 fora do gráfico. O subtítulo do card é genérico
-       de propósito: quem mexer nesta lista não precisa lembrar de mexer no texto da tela. */
-    const cmin={},ccnt={};(H.workouts||[]).forEach(w=>{if(!w.date||!CARDIO.some(t=>(w.type||"").includes(t)))return;const y=w.date.slice(0,7);cmin[y]=(cmin[y]||0)+(w.duration_min||0);ccnt[y]=(ccnt[y]||0)+1;});
-    const cmk=Object.keys(cmin).sort().filter(m=>m>="2025-11");
-    const goalMin=8*27; // meta ~2x/sem * ~27min * 4 sem ≈ 216 min/mês
+    /* P1.8 — ESFORÇO, não "cardio". A lista de tipos saiu inteira. Tipo não separa nada:
+       a bike de agosto também é deslocamento (30/08 a 5,9 km/h, FC 102), e um filtro por
+       modalidade daria 382 min em agosto — acima da meta antiga — aprovando o mês em cima de
+       duas pedaladas até o mercado. Duração separa menos ainda: a faixa de 30–60 min de
+       agosto tem FC média 87. Sobra a FC, que é o que "esforço" quer dizer.
+       O eixo vem dos meses OBSERVADOS (que têm alguma sessão), não dos meses com resultado:
+       junho teve 712 min pelo critério antigo e 0 de esforço, e 0 tem que aparecer. */
+    const cmin={},ccnt={},cobs={};let semFC=0;
+    (H.workouts||[]).forEach(w=>{
+      if(!w.date)return;
+      const y=w.date.slice(0,7);
+      cobs[y]=1;                                     // mês observado, mesmo que nada qualifique
+      const fc=hrMedia(w);
+      if(fc==null){if(y>="2025-11")semFC++;return;}   // sem FC não é zero: é contado e dito
+      if(fc<FC_ESFORCO)return;
+      cmin[y]=(cmin[y]||0)+(w.duration_min||0);ccnt[y]=(ccnt[y]||0)+1;});
+    const cmk=Object.keys(cobs).sort().filter(m=>m>="2025-11");
+    /* A meta de 216 min saiu e nada entra no lugar. Era goalMin=8*27 com um comentário que
+       inventava a própria justificativa; zero ocorrências de 216 ou de qualquer meta de
+       volume de cardio em todo o vault. E o Ciclo 3 a aposentou de propósito: "bike opcional
+       (sem meta)". A régua vira a própria série — o mês anterior é a referência. Meta nova
+       só quando o plano tiver uma, e aí ela nasce no 🚩 Academia, não aqui. */
+    const ate=exportAte(H), parcial=cmk.length?mesIncompleto(cmk[cmk.length-1],ate):false;
     mk("cCardio",{data:{labels:cmk,datasets:[
-      {type:"bar",label:"Cardio (min)",data:cmk.map(m=>Math.round(cmin[m])),backgroundColor:"rgba(34,197,94,.5)",yAxisID:"y"},
-      {type:"line",label:"Meta ~"+goalMin+"min",data:cmk.map(()=>goalMin),borderColor:WARN,borderDash:[5,4],borderWidth:1.5,pointRadius:0,yAxisID:"y"},
-      {type:"line",label:"Sessões",data:cmk.map(m=>ccnt[m]),borderColor:BLUE,backgroundColor:BLUE,yAxisID:"y1",tension:.25,borderWidth:2},
-    ]},options:{maintainAspectRatio:false,scales:{y:{position:"left",title:{display:true,text:"min"}},y1:{position:"right",grid:{drawOnChartArea:false},min:0,title:{display:true,text:"nº"}}}}});
+      {type:"bar",label:"Esforço (min)",data:cmk.map(m=>Math.round(cmin[m]||0)),yAxisID:"y",
+       backgroundColor:cmk.map((m,i)=>(parcial&&i===cmk.length-1)?"rgba(34,197,94,.22)":"rgba(34,197,94,.5)"),
+       borderColor:cmk.map((m,i)=>(parcial&&i===cmk.length-1)?GREEN:"transparent"),
+       borderWidth:cmk.map((m,i)=>(parcial&&i===cmk.length-1)?1:0),borderDash:[4,3]},
+      {type:"line",label:"Sessões",data:cmk.map(m=>ccnt[m]||0),borderColor:BLUE,backgroundColor:BLUE,yAxisID:"y1",tension:.25,borderWidth:2},
+    ]},options:{maintainAspectRatio:false,scales:{y:{position:"left",min:0,title:{display:true,text:"min"}},y1:{position:"right",grid:{drawOnChartArea:false},min:0,title:{display:true,text:"nº"}}}}});
+    /* Os dois estados que um gráfico mensal esconde por padrão: o mês que ainda não acabou
+       (senão o export do dia 12 desenha um colapso) e a sessão sem FC (senão ausência de
+       medida vira ausência de esforço). Nenhum dos dois muda barra nenhuma — ambos falam. */
+    const cnote=[];
+    if(parcial)cnote.push("<b>"+mlabel(cmk[cmk.length-1])+" em curso</b> — export até "+esc(ate.slice(8,10)+"/"+ate.slice(5,7))+", a última barra ainda vai subir");
+    if(semFC)cnote.push(semFC+(semFC===1?" sessão sem":" sessões sem")+" FC registrada ficou de fora — sem medida não dá pra dizer que houve esforço, nem que não houve");
+    if(cnote.length){const cv=document.getElementById("cCardio");
+      if(cv&&cv.parentElement&&cv.parentElement.parentElement){
+        const n=el("div","muted");n.style.marginTop="6px";n.innerHTML=cnote.join("<br>");
+        cv.parentElement.parentElement.appendChild(n);}}
 
     // passos (méd/dia por mês)
     if(H.daily.Steps){const stm=moAvg(H.daily.Steps);const stk=Object.keys(stm).sort().filter(m=>m>="2025-11");
@@ -1577,7 +1707,7 @@ function renderCfg(a){
     "Último salvo: "+(last?"<b>"+esc(last.date)+"</b> · treino "+esc(last.day)+" · "+
       (last.exercises||[]).length+" ex · "+(last.exercises||[]).reduce((b,e)=>b+e.sets.length,0)+" séries":"—")));
   if(corrompidas.length){
-    const al=el("div");al.style.cssText="margin-top:10px;color:var(--danger);font-weight:650";
+    const al=el("div");al.style.cssText="margin-top:10px;color:var(--danger-tx);font-weight:650";
     al.textContent="⚠ "+corrompidas.length+" cópia(s) de dado corrompido preservada(s) — não apague antes de auditar";
     cd.appendChild(al);
   }
@@ -1605,13 +1735,13 @@ function renderCfg(a){
     const d=new Date(r.t),hh=String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
     const li=el("div");li.style.cssText="padding:6px 0;border-top:1px solid var(--border)";
     li.innerHTML="<span style='font-variant-numeric:tabular-nums' class='muted'>"+
-      d.toISOString().slice(0,10)+" "+hh+"</span> <b style='color:"+(ioFail(r)?"var(--danger)":"var(--accent)")+"'>"+
+      d.toISOString().slice(0,10)+" "+hh+"</span> <b style='color:"+(ioFail(r)?"var(--danger-tx)":"var(--accent-tx)")+"'>"+
       esc(r.kind)+"</b> <span class='muted'>"+esc(r.key||"")+"</span><br>"+esc(r.msg||"");
     gw.appendChild(li);
   });
   const gb=el("button","btn-ghost btn-sm","Log de gravações"+(falhas.length?" ("+falhas.length+" falha(s))":""));
   gb.style.marginTop="8px";
-  if(falhas.length)gb.style.color="var(--danger)";
+  if(falhas.length)gb.style.color="var(--danger-tx)";
   gb.onclick=()=>{const o=gw.style.display!=="none";gw.style.display=o?"none":"block";
     gb.textContent=o?("Log de gravações"+(falhas.length?" ("+falhas.length+" falha(s))":"")):"Ocultar log";};
   cd.appendChild(gb);cd.appendChild(gw);
@@ -1807,13 +1937,54 @@ function doImport(){
    continua em showMarkdown(), como cópia pra área de transferência. */
 
 /* ============ VERSÃO ============ */
-const APP_VERSION="1.6.1";
+const APP_VERSION="1.9.0";
 const APP_RELEASED="2026-08-31";
 /* Versionamento semântico MAJOR.MINOR.PATCH
    MAJOR = muda o formato dos dados (backup/restore incompatível)
    MINOR = funcionalidade nova, dados compatíveis
    PATCH = correção sem mudar comportamento                        */
 const APP_CHANGELOG=[
+ {v:"1.9.0",d:"2026-08-31",c:[
+   "O campo RIR saiu da linha de série: 1 série preenchida em 1.465 (0,07%), contra 100% de repetições",
+   "Eram três campos iguais e um terço da área de digitação nunca foi usado em dez meses",
+   "kg e reps ganham ~50% de largura cada na linha que ele preenche ~18 vezes por treino",
+   "O texto de ajuda parou de ensinar um campo que ninguém preenchia",
+   "A chave rir continua no formato salvo: a única série que a tem não é perdida, e o backup não muda",
+   "Séries históricas com RIR continuam saindo no Markdown e no analysisExport",
+   "De carona, o × de apagar série virou alvo de 44×44 px — era ~30×34, e ele agora tem espaço"]},
+ {v:"1.8.0",d:"2026-08-31",c:[
+   "'Cardio (min/mês)' não media cardio: virou 'Esforço (min/mês · FC ≥ 145)'",
+   "Contava toda caminhada do Watch, deslocamento incluído — 834 min em agosto com FC média 100",
+   "Agosto marcava 1.030 min contra uma meta de 216, 4,8× — de esforço real foram 186",
+   "Tipo de treino não separava: a bike de 30/08 fez 6,5 km em 66 min, velocidade de caminhada",
+   "O critério é FC média da sessão ≥ 145: nenhuma caminhada da janela chegou lá",
+   "Com o filtro, agosto (186 min) é o melhor mês em dez, e o VO2 responde — antes era igual a junho, que teve zero",
+   "A meta de 216 min/mês saiu e nada entrou no lugar: era 8×27 com o comentário inventando a justificativa",
+   "O plano a aposentou em 01/06 ('bike opcional, sem meta') — a linha tracejada desenhava meta apagada há três ciclos",
+   "Mês sem nenhuma sessão qualificada aparece como barra zero, não some do eixo",
+   "Mês em curso vem hachurado e datado: export do dia 12 não desenha mais colapso",
+   "Sessão sem FC registrada é contada e dita, não descartada em silêncio",
+   "Sem a chave 'workouts' o card diz qual faltou, em vez de desenhar eixo vazio"]},
+ {v:"1.7.1",d:"2026-08-31",c:[
+   "O tema claro passou a ser usável — era a preferência declarada dele e nunca funcionou",
+   "body.light redefinia seis tokens e esquecia accent, warn, danger e o vermelho de queda",
+   "No claro não dava pra ver em que aba você estava: a aba ativa marcava 2,26:1",
+   "Pior que isso: o nome do treino nos quatro cards da Home era branco sobre branco (1,00:1)",
+   "Rótulo branco sobre verde dava 2,28:1 em ✓ Finalizar treino e Continuar treino → nos DOIS temas",
+   "Texto escuro no mesmo verde dá 8,43:1; no azul do 📋 Markdown, 5,23:1",
+   "Cor de fundo e cor de texto viraram tokens separados — no escuro coincidem, no claro não",
+   "user-scalable=no saiu: no PWA instalado o iOS obedecia e travava a ampliação com dois dedos",
+   "Botão ganhou foco visível (:focus-visible), que só input e select tinham"]},
+ {v:"1.7.0",d:"2026-08-31",c:[
+   "Sessão não finalizada de outro dia para de se disfarçar de treino em andamento",
+   "O card da Home diz 'Sessão não finalizada · iniciada em DD/MM', com borda de aviso",
+   "'Continuar treino →' some no estado órfão: no lugar, 'Finalizar com o que tem' e 'Descartar'",
+   "Órfã não abre mais direto no log ao abrir o app — cai na Home, que é onde está o aviso",
+   "O bloco de backup declara a sessão que está deixando de fora, com a letra e a data",
+   "Isso é real e recorrente: 14/08 foi fechada 27,6 h depois e 21/08, 110,2 h depois",
+   "'active' continua fora do backup de propósito: restaurar ressuscitaria um treino que já acabou",
+   "Finalizar dias depois avisa que a duração é o intervalo entre carimbos, não tempo de treino",
+   "Sessão gravada que não pôde ser lida aparece na Home em vez de sumir"]},
  {v:"1.6.1",d:"2026-08-31",c:[
    "O alarme do fim do descanso passou a tocar no iPhone — nunca tocou, em 81 sessões",
    "O AudioContext nascia dentro do tick do cronômetro: fora de gesto do usuário o iOS o deixa suspenso e mudo",
