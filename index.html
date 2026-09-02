@@ -345,6 +345,40 @@ let templates = load(K.tpl, null) || DEFAULT_TEMPLATES;
 let sessions  = load(K.sess, []);
 let active    = ensureIds(load(K.active, null));   // retrocompat: sessão salva sem id
 let cfg       = load(K.cfg, {ciclo:"C4", plano:"ABCD", musicUrl:""});
+
+/* ---------- P7.1 (v1.14.1): espaço sobrando no nome do exercício ----------
+   'Kick extension ' e 'Kick extension' são exercícios DIFERENTES pro app: os casamentos
+   por nome são todos ===, e a diferença é invisível na tela porque o HTML já colapsa
+   espaço em branco. O dropdown do Histórico mostrava duas entradas desenhadas idênticas,
+   o Teto de carga contava dois tetos pro mesmo exercício, e o casamento com as notas do
+   vault (que não têm o espaço) não fechava.
+
+   Isto NÃO é a normalização de CAIXA que ficou de fora da v1.14.0. Lá havia decisão de
+   produto: qual grafia vence, e o rótulo na tela mudava ('Overhead Banco' viraria
+   'Overhead banco'), o app sobrescrevendo o que ele digitou. Aqui nenhum rótulo muda —
+   'Supino ' JÁ era desenhado 'Supino' — e ninguém digita espaço à direita de propósito.
+
+   NÃO-DESTRUTIVO: apara só a cópia em memória, na leitura. O localStorage não é
+   reescrito aqui — nenhuma migração no boot, nenhum save() novo. Os nomes aparados
+   chegam ao disco pelo próximo salvamento normal (finishSession/import), que já tem
+   prova de releitura e tela de confirmação. Quantos foram aparados aparece em
+   Ajustes → Diagnóstico de dados: unificar calado seria a cicatriz nº 2 de volta. */
+function trimNome(s){return String(s==null?"":s).replace(/\s+/g," ").trim();}
+const aparados={n:0, exemplos:[]};
+function aparaNomes(lista,campo){
+  (Array.isArray(lista)?lista:[]).forEach(o=>{
+    ((o&&Array.isArray(o[campo]))?o[campo]:[]).forEach(e=>{
+      if(!e)return;
+      const t=trimNome(e.n);
+      if(t===e.n)return;
+      aparados.n++;
+      if(aparados.exemplos.length<4&&aparados.exemplos.indexOf(t)<0)aparados.exemplos.push(t);
+      e.n=t;});
+  });
+}
+aparaNomes(Object.values(templates),"ex");        // a fonte: template sujo suja toda sessão nova
+aparaNomes(sessions,"exercises");                  // o legado já gravado
+aparaNomes(active?[active]:[],"exercises");        // sessão em andamento nascida de template sujo
 const GOALS_DEFAULT={weight:[81,83], fat:[15,17], lean:66}; // metas de recomposição
 function goals(){return cfg.goals||GOALS_DEFAULT;}
 function applyTheme(){document.body.classList.toggle("light",cfg.theme==="light");}
@@ -790,7 +824,7 @@ function startSession(d){
   if(active && !confirm("Já existe um treino em andamento. Descartar e começar "+d+"?"))return;
   const t=templates[d];
   active={day:d,date:today(),ciclo:cfg.ciclo,plano:cfg.plano,started:Date.now(),
-    exercises:orderLikeLast(d,t.ex).map(e=>({n:e.n,sr:e.sr,rest:e.rest,mvw:e.mvw,notes:e.notes,sets:[]}))};
+    exercises:orderLikeLast(d,t.ex).map(e=>({n:trimNome(e.n),sr:e.sr,rest:e.rest,mvw:e.mvw,notes:e.notes,sets:[]}))};  // v1.14.1: template sujo não suja a sessão
   ensureIds(active);
   save(K.active,active);go("log");
 }
@@ -1363,7 +1397,7 @@ function histExPadrao(names){
   return names[0];
 }
 const HIST_METRICAS=[["peso","Carga máx"],["vol","Volume"],["e1rm","1RM est."]];
-let histEx=(typeof cfg.histEx==="string"&&cfg.histEx)?cfg.histEx:null;
+let histEx=(typeof cfg.histEx==="string"&&cfg.histEx)?trimNome(cfg.histEx):null;   // v1.14.1: escolha gravada com espaço ainda casa
 /* v1.14.0 — a métrica escolhida resetava a cada reload enquanto o exercício sobrevivia
    (cfg.histEx, desde a v1.10.0). Leitura defensiva no mesmo padrão: o restore faz cfg=d.cfg
    e backup antigo não tem a chave, então valor ausente ou desconhecido cai em "peso". */
@@ -2217,6 +2251,15 @@ function renderCfg(a){
     al.textContent="⚠ "+corrompidas.length+" cópia(s) de dado corrompido preservada(s) — não apague antes de auditar";
     cd.appendChild(al);
   }
+  /* v1.14.1 — unificar nome calado seria a cicatriz nº 2. Não é falha, então não é vermelho:
+     é o relato do que a leitura fez e do que ainda não foi ao disco. */
+  if(aparados.n){
+    const ap=el("div");ap.style.cssText="margin-top:10px";
+    ap.innerHTML="<span class='muted'><b>"+aparados.n+"</b> nome(s) de exercício tinham espaço sobrando e foram unificados na leitura"+
+      (aparados.exemplos.length?" — ex.: "+esc(aparados.exemplos.join(", ")):"")+
+      ".<br>O arquivo gravado só muda no próximo salvamento normal — nada foi reescrito agora.</span>";
+    cd.appendChild(ap);
+  }
 
   // últimos salvamentos, com conteúdo real
   const lw=el("div");lw.style.cssText="display:none;margin-top:10px";
@@ -2326,6 +2369,11 @@ function editTemplate(d){
     const c=el("div","ex");
     const h=el("div","row");h.style.justifyContent="space-between";
     const nmi=el("input");nmi.type="text";nmi.value=e.n;nmi.style.textAlign="left";nmi.oninput=()=>{e.n=nmi.value;save(K.tpl,templates);};
+    /* v1.14.1 — aqui nascia o 'Supino ': gravava a cada tecla, sem aparar nunca. O trim é no
+       COMMIT (blur/Enter) e NÃO no oninput — aparar a cada tecla tornaria impossível digitar
+       o espaço entre duas palavras. */
+    nmi.onchange=()=>{const t=trimNome(nmi.value);if(t===nmi.value)return;
+      nmi.value=t;e.n=t;if(!save(K.tpl,templates))toast("Nome não foi gravado — ver Diagnóstico");};
     h.appendChild(nmi);
     const del=el("button","del","×");del.onclick=()=>{t.ex.splice(i,1);save(K.tpl,templates);editTemplate(d);};
     h.appendChild(del);c.appendChild(h);
@@ -2421,6 +2469,13 @@ function doImport(){
       if(d.templates)templates=d.templates;
       if(d.sessions)sessions=d.sessions;
       if(d.cfg)cfg=d.cfg;
+      /* v1.14.1 — o import atribui por cima DEPOIS do boot, então o apara da leitura não
+         o alcançaria: um backup do vault com 'Kick extension ' remontaria o nome partido
+         até o próximo reload. Aqui o save() seguinte é explícito e confirmado na tela,
+         então gravar aparado não é reescrita silenciosa. */
+      aparaNomes(Object.values(templates),"ex");
+      aparaNomes(sessions,"exercises");
+      if(d.cfg&&typeof cfg.histEx==="string")cfg.histEx=trimNome(cfg.histEx);
       const ok=[["templates",save(K.tpl,templates)],["sessions",save(K.sess,sessions)],["cfg",save(K.cfg,cfg)]]
         .filter(x=>!x[1]).map(x=>x[0]);
       if(ok.length){
@@ -2443,13 +2498,25 @@ function doImport(){
    continua em showMarkdown(), como cópia pra área de transferência. */
 
 /* ============ VERSÃO ============ */
-const APP_VERSION="1.14.0";
+const APP_VERSION="1.14.1";
 const APP_RELEASED="2026-09-02";
 /* Versionamento semântico MAJOR.MINOR.PATCH
    MAJOR = muda o formato dos dados (backup/restore incompatível)
    MINOR = funcionalidade nova, dados compatíveis
    PATCH = correção sem mudar comportamento                        */
 const APP_CHANGELOG=[
+ {v:"1.14.1",d:"2026-09-02",c:[
+   "Exercício com espaço sobrando no nome ('Kick extension ') era exercício diferente pro app",
+   "A diferença era invisível: o HTML já colapsa espaço, então o dropdown mostrava duas linhas desenhadas idênticas",
+   "O Teto de carga contava dois tetos pro mesmo exercício, e o nome não casava com as notas do vault",
+   "A leitura passa a aparar o espaço — nada é reescrito no boot, só a cópia em memória",
+   "Quantos nomes foram unificados aparece em Ajustes → Diagnóstico de dados: unificar calado seria o mesmo erro de antes",
+   "A fonte era o editor de template, que gravava o nome a cada tecla sem nunca aparar",
+   "O trim ali é no commit (sair do campo), não a cada tecla — senão não dá pra digitar o espaço entre duas palavras",
+   "Sessão nova nascida de template sujo já nasce com o nome aparado",
+   "Import de backup também apara: um arquivo do vault não remonta o nome partido até o próximo reload",
+   "Não é a normalização de caixa que ficou de fora da v1.14.0: ali o rótulo na tela mudava e havia decisão de produto, aqui nenhum rótulo muda",
+   "Consequência assumida: dois exercícios que só diferiam pelo espaço viram um só, e a Análise passa a contar um teto onde contava dois"]},
  {v:"1.14.0",d:"2026-09-02",c:[
    "Histórico vira painel de duas colunas no desktop: gráfico à esquerda, sessões à direita",
    "A lista de sessões deixa de ser cortada em 5 — no desktop aparecem todas, e a contagem está no título do cartão",
