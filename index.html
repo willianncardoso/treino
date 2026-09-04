@@ -1089,8 +1089,19 @@ function exCard(e,ei,isActive){
 function updVol(card){const e=active.exercises[[...$("#app").querySelectorAll(".ex")].indexOf(card)];if(!e)return;
   const v=card.querySelector("[data-vol]");if(v)v.textContent=Math.round(setVol(e.sets))+" kg·rep";
   const pv=$("#app").querySelector(".card .muted");}
-function inp(val,ph,on){const i=el("input");i.type="number";i.inputMode="decimal";i.placeholder=ph;i.value=val==null?"":val;
-  i.oninput=()=>on(i.value);i.onfocus=()=>keepFieldVisible(i);return i;}
+/* v1.14.2 — era type="number". O padrão HTML só aceita PONTO como separador decimal:
+   no teclado pt-BR o "7,5" chegava com a vírgula descartada e virava 75 — dez vezes a carga,
+   sem aviso nenhum. type="text" não sanitiza, então a normalização passa a ser explícita aqui,
+   e inputMode="decimal" mantém o teclado numérico do iPhone. Guardamos sempre com ponto:
+   todo consumidor faz parseFloat, e parseFloat("7,5") é 7 — errar aqui seria trocar um bug por outro. */
+function inp(val,ph,on){const i=el("input");i.type="text";i.inputMode="decimal";i.autocomplete="off";
+  i.placeholder=ph;i.value=val==null?"":val;
+  i.oninput=()=>{const p=i.selectionStart;
+    const limpo=i.value.replace(/,/g,".").replace(/[^0-9.]/g,"").replace(/^(\d*\.\d*).*$/,"$1");
+    if(limpo!==i.value){const d=i.value.length-limpo.length;i.value=limpo;
+      const c=Math.max(0,(p==null?limpo.length:p)-d);i.setSelectionRange(c,c);}
+    on(i.value);};
+  i.onfocus=()=>keepFieldVisible(i);return i;}
 
 function lastLogFor(name,day){
   for(let i=sessions.length-1;i>=0;i--){const s=sessions[i];if(day&&s.day!==day)continue;
@@ -2498,13 +2509,21 @@ function doImport(){
    continua em showMarkdown(), como cópia pra área de transferência. */
 
 /* ============ VERSÃO ============ */
-const APP_VERSION="1.14.1";
-const APP_RELEASED="2026-09-02";
+const APP_VERSION="1.14.2";
+const APP_RELEASED="2026-09-04";
 /* Versionamento semântico MAJOR.MINOR.PATCH
    MAJOR = muda o formato dos dados (backup/restore incompatível)
    MINOR = funcionalidade nova, dados compatíveis
    PATCH = correção sem mudar comportamento                        */
 const APP_CHANGELOG=[
+ {v:"1.14.2",d:"2026-09-04",c:[
+   "Campo de carga aceita vírgula: digitar 7,5 gravava 75, dez vezes o peso, sem aviso",
+   "A causa era o type=number do HTML, que só reconhece ponto como separador — no teclado pt-BR a vírgula era descartada e os dígitos se juntavam",
+   "Virou type=text com inputMode=decimal: o teclado numérico do iPhone continua igual, e a normalização vírgula→ponto passou a ser explícita",
+   "Continua gravando com ponto: todo o resto do app lê com parseFloat, e parseFloat('7,5') devolve 7",
+   "Letra e segundo separador colados no campo também são recusados agora; o cursor não pula mais pro fim ao corrigir",
+   "Achado por um conflito de sync: o Coice tríceps de 26/08 estava 75 kg no celular e 7,5 no vault",
+   "Não corrige o histórico já gravado — valores antigos precisam ser conferidos um a um"]},
  {v:"1.14.1",d:"2026-09-02",c:[
    "Exercício com espaço sobrando no nome ('Kick extension ') era exercício diferente pro app",
    "A diferença era invisível: o HTML já colapsa espaço, então o dropdown mostrava duas linhas desenhadas idênticas",
