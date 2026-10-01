@@ -159,6 +159,29 @@ body.wide .histgrid .card{margin-bottom:0}
 /* Com 25 sessões a coluna da direita passa de 1500px contra ~340px do gráfico: sem sticky
    o gráfico some da tela no primeiro rolar. */
 body.wide .histchart{position:sticky;top:18px}
+/* v1.15.0 — Home (P7.1). O herói é um .card, os tiles são .daycard, a semana é um .card:
+   o vocabulário é o de sempre. O que nasce aqui é só o que não existia — selo, letra grande,
+   barra de progresso e os sete círculos da semana. Nada anima: nenhuma transição nova. */
+.hm-selo{display:inline-block;font-size:11px;font-weight:750;letter-spacing:.5px;padding:3px 8px;border-radius:6px;background:var(--accent);color:#0b0f14}
+.hm-selo.anda{background:var(--accent2)}
+.hm-letra{font-size:48px;font-weight:800;line-height:1;color:var(--accent-tx);min-width:40px}
+.hm-ex{display:flex;justify-content:space-between;gap:10px;padding:4px 0;font-size:15px}
+.hm-ex .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hm-ex .muted{flex:0 0 auto;white-space:nowrap}
+.hm-cta{width:100%;min-height:52px;font-size:16px;margin-top:12px}
+.hm-tiles{grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.hm-tile{padding:12px;min-height:44px}
+.hm-tile .big{font-size:28px;line-height:1.1}
+.hm-barra{height:8px;border-radius:4px;background:var(--surface2);overflow:hidden;margin:12px 0 6px}
+.hm-barra i{display:block;height:100%;background:var(--accent)}
+.hm-semana{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;margin:12px 0 10px}
+.hm-semana .lb{font-size:11px;color:var(--muted);margin-bottom:5px}
+.hm-dia{width:36px;height:36px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;background:var(--surface2);font-weight:700;font-size:13px;color:var(--muted)}
+.hm-dia.cheio{background:var(--accent);color:#0b0f14}
+.hm-dia.hoje{box-shadow:0 0 0 2px var(--accent2)}
+.hm-dia.hoje:not(.cheio){color:var(--text)}
+.hm-dia.anda{background:transparent;border:2px solid var(--accent2);box-shadow:none;color:var(--text)}
+.hm-dia.duas{font-size:11px;letter-spacing:-.3px}
 </style>
 </head>
 <body>
@@ -459,9 +482,30 @@ function startElapsed(){clearInterval(elapsedId);
   const tick=()=>{if(!active){clearInterval(elapsedId);return;}const s=fmtDur(Date.now()-active.started);
     const e=$("#sbElapsed");if(e)e.textContent=s;const e2=$("#sbElapsedR");if(e2)e2.textContent=s;};
   tick();elapsedId=setInterval(tick,1000);}
+/* v1.15.0 — progresso de uma sessão em andamento. UMA função só, lida pelo herói da Home e
+   pela barra da aba de treino (e, na P8.2, pelo cabeçalho do treino). Antes a barra contava
+   "exercício com alguma linha de série", e a Home passaria a contar outra coisa: duas telas
+   dizendo números diferentes sobre o mesmo treino.
+   X = exercícios marcados como feitos E com ≥1 série com reps (pulado não conta).
+   S = séries com reps — o que o finishSession guarda. Linha só com peso não é série. */
+function progresso(act){
+  const exs=(act&&Array.isArray(act.exercises))?act.exercises:[];
+  let x=0,s=0;
+  exs.forEach(e=>{const n=completedSets({sets:Array.isArray(e.sets)?e.sets:[]});s+=n;if(e.done&&n>=1)x++;});
+  return {x:x,m:exs.length,s:s};
+}
+/* O exercício "do momento": o do último set logado, se ainda não foi concluído; senão o 1º não
+   concluído; -1 se todos estão concluídos. É o alvo do `Continuar treino →` (P4.7) e o `AGORA`
+   do herói — a mesma função, pra que a caixa nunca aponte um exercício e o toque leve a outro. */
+function exercicioDoMomento(act){
+  const exs=(act&&Array.isArray(act.exercises))?act.exercises:[];
+  let i=act&&act.ultimoExercicioId?exs.findIndex(e=>e.id===act.ultimoExercicioId):-1;
+  if(i<0||exs[i].done)i=exs.findIndex(e=>!e.done);
+  return i;
+}
 function refreshSbIdle(){if(!active)return;const p=$("#sbProg"),v=$("#sbVol");
-  const done=active.exercises.filter(e=>e.sets.length).length;
-  if(p)p.textContent=done+"/"+active.exercises.length+" ex";
+  const pr=progresso(active);
+  if(p)p.textContent=pr.x+"/"+pr.m+" ex";
   if(v)v.textContent=Math.round(sessVol(active))+" kg·rep";}
 function updateSessionBar(){const sb=$("#sessionbar");if(!sb)return;
   if(tab==="log"&&active){sb.classList.add("on");refreshSbIdle();startElapsed();resumeRest();}
@@ -644,61 +688,32 @@ function render(){renderTabs();const a=$("#app");a.innerHTML="";
 function isOrfa(){return !!(active&&active.date&&active.date!==today());}
 function ddmm(d){const p=String(d||"").split("-");return p.length===3?p[2]+"/"+p[1]:String(d||"");}
 
-function renderHome(a){
-  a.appendChild(el("div","row",""+
-    "<div style='flex:1'><h1>Treino</h1><div class='muted'>Ciclo "+esc(cfg.ciclo)+" · Plano "+esc(cfg.plano)+"</div></div>"));
-  const actFail=readFailed(K.active);
-  if(actFail&&!active){                              // cicatriz nº 1: não some, diz por quê
-    const c=el("div","card");
-    c.style.borderColor="var(--danger-tx)";
-    c.innerHTML="<div style='font-weight:700;color:var(--danger-tx)'>Há uma sessão gravada que não pôde ser lida</div>"+
-      "<div class='muted' style='margin-top:4px'>"+esc(actFail)+". Nada foi apagado.</div>";
-    const b=el("button","btn-ghost","Ver Ajustes → Diagnóstico de dados");b.style.width="100%";b.style.marginTop="10px";
-    b.onclick=()=>go("cfg");
-    c.appendChild(b);a.appendChild(c);
-  }
-  if(active){
-    const orfa=isOrfa();
-    const c=el("div","card");
-    c.style.borderColor=orfa?"var(--warn-tx)":"var(--accent)";
-    const nome=templates[active.day]?templates[active.day].name:active.day;
-    c.innerHTML="<div class='muted'>"+(orfa
-        ? "<b style='color:var(--warn-tx)'>Sessão não finalizada · iniciada em "+esc(ddmm(active.date))+"</b>"
-        : "Sessão em andamento")+
-      "</div><h2 style='margin:4px 0'>Treino "+esc(active.day)+" — "+esc(nome)+"</h2>";
-    if(orfa){
-      /* `Continuar treino →` some: continuar é o que ele não vai fazer num treino de dias
-         atrás. finishSession() já descarta série em branco e exercício sem série, e
-         validateSession() já barra com erro nomeado quando não sobrou nada — se não houver
-         nada válido, isto cai na tela `save` em estado de erro, que já existe. */
-      c.appendChild(el("div","muted","Ela não entra no backup e não chega ao vault enquanto não for finalizada."));
-      const f=el("button","btn-primary","Finalizar com o que tem");f.style.width="100%";f.style.marginTop="10px";
-      f.onclick=finishSession;
-      const d=el("button","btn-danger","Descartar");d.style.width="100%";d.style.marginTop="8px";
-      d.onclick=()=>{if(confirm("Descartar este treino? Os dados não serão salvos."))
-        {active=null;localStorage.removeItem(K.active);go("home");}};
-      c.appendChild(f);c.appendChild(d);
-    }else{
-      const b=el("button","btn-primary","Continuar treino →");b.style.width="100%";
-      b.onclick=()=>{wantScrollActive=true;go("log");};
-      c.appendChild(b);
-    }
-    a.appendChild(c);
-  }
-  a.appendChild(weekBox());
-
-  a.appendChild(el("h3",null,"Escolher treino"));
-  const falhou=readFailed(K.sess);
-  if(falhou)a.appendChild(el("div","muted","histórico não pôde ser lido — a ordem abaixo é a do template · ver Ajustes → Diagnóstico de dados"));
-  const g=el("div","daygrid");
-  /* P4.10 — a ordem A,B,C,D era o calendário do plano, que não existe mais: não há
-     getDay() em lugar nenhum do arquivo. Ordenada por dias sem treinar, a posição passa a
-     significar "o que você deve", que é um invariante melhor que "a letra A vem primeiro".
-     Reordenar aqui é seguro e no P4.7 não é: aqui a ordem só muda ENTRE visitas, depois de
-     um treino terminar — nunca embaixo do polegar no meio de uma série. */
-  const diasDe=d=>{const l=lastSessionFor(d);return l?daysSince(l.date):null;};
+/* ---------- v1.15.0 — Home nova (P7.1) ----------
+   Uma pergunta, respondida antes da porta da academia: "qual treino agora?". O herói ocupa o
+   topo com UMA resposta, e o que mais existe fica abaixo dele. Prioridade do lugar do herói
+   (um só aparece, nesta ordem — spec P7 (b)):
+     1. a sessão gravada não pôde ser lida  → card de erro (cicatriz nº 1)
+     2. sessão de outro dia (órfã)          → Finalizar com o que tem / Descartar
+     3. sessão de hoje em andamento         → herói em treino (progresso)
+     4. o histórico não pôde ser lido       → SEM herói: recomendar "o mais parado" sem
+                                              histórico seria inventar
+     5. nada disso                          → herói ocioso: o mais parado
+   A regra de escolha é a do P4.10 e não muda: ela só ganha um lugar. */
+const DIASEM=["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
+const MESX=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+function dataExtenso(){const d=new Date();return DIASEM[d.getDay()]+", "+d.getDate()+" de "+MESX[d.getMonth()];}
+function diasDe(d){const l=lastSessionFor(d);return l?daysSince(l.date):null;}
+function idadeTxt(n){return n===null?"nunca treinado":n===0?"hoje":n===1?"ontem":"há "+n+" dias";}
+/* P4.10 — a ordem A,B,C,D era o calendário do plano, que não existe mais: não há
+   getDay() em lugar nenhum do arquivo. Ordenada por dias sem treinar, a posição passa a
+   significar "o que você deve", que é um invariante melhor que "a letra A vem primeiro".
+   Reordenar aqui é seguro e no P4.7 não é: aqui a ordem só muda ENTRE visitas, depois de
+   um treino terminar — nunca embaixo do polegar no meio de uma série.
+   Sem histórico legível, a ordem é a da letra: não há base pra recomendar nada. */
+function ordemTreinos(falhou){
   const letras=Object.keys(templates);
-  const ordem=falhou?letras:letras.slice().sort((x,y)=>{
+  if(falhou)return letras.slice().sort();
+  return letras.slice().sort((x,y)=>{
     const a1=diasDe(x),b1=diasDe(y);
     if(a1===null&&b1===null)return x<y?-1:1;
     if(a1===null)return -1;               // nunca treinado vai pro topo…
@@ -706,39 +721,157 @@ function renderHome(a){
     if(a1!==b1)return b1-a1;              // …e o resto, mais dias sem treinar primeiro
     return x<y?-1:1;                      // empate de data: desempata pela letra
   });
-  ordem.forEach(d=>{
-    const t=templates[d];const card=el("button","daycard");
-    /* O card imprimia `último: 2026-08-07`. Pra saber que são 24 dias ele tinha que fazer
-       conta de data de cabeça, em pé, na porta da academia. Ninguém faz. E o "nunca
-       treinado" é textual e SEM cor de aviso: vai pro topo por palpite, mas ausência não
-       se disfarça de "há muitos dias", que é um fato que o dado não sustenta. */
-    let sel;
-    if(falhou)sel="<div class='muted' style='margin-top:4px'>histórico não lido</div>";
-    else{
-      const n=diasDe(d);
-      const txt=n===null?"nunca treinado":n===0?"hoje":n===1?"ontem":"há "+n+" dias";
-      const alerta=n!==null&&n>DIAS_ALERTA;   // 4 letras ÷ 3 sessões/semana = ciclo de 9,3 dias
-      sel="<div class='muted' style='margin-top:4px'>"+
-          (alerta?"<b style='color:var(--warn-tx)'>"+txt+"</b>":txt)+"</div>";
-    }
-    card.innerHTML="<div class='big'>"+d+"</div><div style='font-weight:600;margin:2px 0'>"+esc(t.name)+"</div>"+
-      "<div class='muted'>"+t.ex.length+" exercícios</div>"+sel;
-    card.onclick=()=>startSession(d);
-    g.appendChild(card);
-  });
-  a.appendChild(g);
+}
+let homeDia=null;   // dia do último render da Home — a virada de semana/dia re-renderiza
+function renderHome(a){
+  homeDia=today();
+  const h=el("div","row");h.style.alignItems="flex-start";h.style.marginBottom="14px";
+  h.innerHTML="<div style='flex:1;min-width:0'><div class='muted'>"+esc(dataExtenso())+"</div>"+
+    "<h1 style='margin:2px 0 0;font-size:26px'>Treino</h1></div>"+
+    "<span class='pill' style='margin-top:4px'>"+esc(cfg.ciclo)+" · "+esc(cfg.plano)+"</span>";
+  a.appendChild(h);
 
-  if(sessions.length){
-    a.appendChild(el("h3",null,"Recentes"));
+  const actFail=readFailed(K.active), falhou=readFailed(K.sess);
+  const ordem=ordemTreinos(falhou);
+  const modo=(actFail&&!active)?"erro":(active&&isOrfa())?"orfa":active?"treino":falhou?"semhist":"ocioso";
+
+  if(modo==="erro"){                                 // cicatriz nº 1: não some, diz por quê
     const c=el("div","card");
-    sessions.slice(-5).reverse().forEach(s=>{
+    c.style.borderColor="var(--danger-tx)";
+    c.innerHTML="<div style='font-weight:700;color:var(--danger-tx)'>Há uma sessão gravada que não pôde ser lida</div>"+
+      "<div class='muted' style='margin-top:4px'>"+esc(actFail)+". Nada foi apagado.</div>";
+    const b=el("button","btn-ghost","Ver Ajustes → Diagnóstico de dados");b.style.width="100%";b.style.marginTop="10px";
+    b.onclick=()=>go("cfg");
+    c.appendChild(b);a.appendChild(c);
+  }else if(modo==="orfa"){
+    /* P1.10 — `Continuar treino →` some: continuar é o que ele não vai fazer num treino de dias
+       atrás. finishSession() já descarta série em branco e exercício sem série, e
+       validateSession() já barra com erro nomeado quando não sobrou nada — se não houver
+       nada válido, isto cai na tela `save` em estado de erro, que já existe. */
+    const c=el("div","card");c.style.borderColor="var(--warn-tx)";
+    const nome=templates[active.day]?templates[active.day].name:active.day;
+    c.innerHTML="<div class='muted'><b style='color:var(--warn-tx)'>Sessão não finalizada · iniciada em "+esc(ddmm(active.date))+"</b></div>"+
+      "<h2 style='margin:4px 0'>Treino "+esc(active.day)+" — "+esc(nome)+"</h2>";
+    c.appendChild(el("div","muted","Ela não entra no backup e não chega ao vault enquanto não for finalizada."));
+    const f=el("button","btn-primary","Finalizar com o que tem");f.style.width="100%";f.style.marginTop="10px";
+    f.onclick=finishSession;
+    const d=el("button","btn-danger","Descartar");d.style.width="100%";d.style.marginTop="8px";
+    d.onclick=()=>{if(confirm("Descartar este treino? Os dados não serão salvos."))
+      {active=null;localStorage.removeItem(K.active);go("home");}};
+    c.appendChild(f);c.appendChild(d);a.appendChild(c);
+  }else if(modo==="treino"){
+    a.appendChild(heroiEmTreino());
+  }else if(modo==="ocioso"&&ordem.length){
+    a.appendChild(heroiOcioso(ordem[0]));
+  }
+
+  /* Outros treinos. Em treino, some: tocar num tile só levaria ao confirm de descartar.
+     `inicio` só é gravado quando havia herói na tela pra contrariar — sem herói (erro, órfã,
+     histórico ilegível) a escolha não diz nada sobre a regra do "mais parado". */
+  if(modo!=="treino"){
+    const tiles=modo==="ocioso"?ordem.slice(1):ordem;
+    if(falhou)a.appendChild(el("div","muted","histórico não pôde ser lido — ordem do template · ver Ajustes → Diagnóstico de dados"));
+    if(!ordem.length)a.appendChild(el("div","empty","<div>Nenhum treino cadastrado · ver Ajustes → Editar treinos</div>"));
+    if(tiles.length){
+      a.appendChild(el("div","muted",modo==="ocioso"?"Outros treinos":"Escolher treino")).style.margin="4px 0 8px";
+      const g=el("div","daygrid hm-tiles");
+      tiles.forEach(d=>g.appendChild(tileTreino(d,falhou,modo==="ocioso"?"outro":null)));
+      a.appendChild(g);
+    }
+  }
+
+  a.appendChild(semanaCard());
+
+  if(sessions.length&&!falhou){
+    const hd=el("div","row");hd.style.margin="4px 0 8px";
+    hd.appendChild(el("h3",null,"Recentes")).style.cssText="flex:1;margin:0";
+    const vh=el("button","btn-ghost btn-sm","Ver histórico →");vh.onclick=()=>go("hist");
+    hd.appendChild(vh);a.appendChild(hd);
+    /* 3, não 5: a Home é a porta da academia, não o Histórico. O 📋 Markdown saiu daqui e
+       continua no detalhe da sessão, no Histórico — nada se perde. */
+    const c=el("div","card");c.style.padding="4px 16px";
+    sessions.slice(-3).reverse().forEach(s=>{
       const r=el("div","sess");
-      r.innerHTML="<div class='row'><span class='dot'>"+s.day+"</span><div><div style='font-weight:600'>"+esc(templates[s.day]?templates[s.day].name:s.day)+"</div><div class='muted'>"+s.date+" · "+Math.round(sessVol(s))+" kg·rep"+(durTxt(s)?" · "+esc(durTxt(s)):"")+"</div></div></div>";
-      const v=el("button","btn-ghost btn-sm","MD");v.onclick=()=>showMarkdown(s);
-      r.appendChild(v);c.appendChild(r);
+      const dt=durTxt(s);
+      r.innerHTML="<div class='row' style='min-width:0'><span class='dot'>"+esc(s.day)+"</span><div style='min-width:0'>"+
+        "<div style='font-weight:600'>"+esc(templates[s.day]?templates[s.day].name:s.day)+"</div>"+
+        (dt?"<div class='muted'>"+esc(dt)+"</div>":"")+"</div></div>"+
+        "<div class='muted' style='text-align:right;flex:0 0 auto;margin-left:10px'>"+esc(ddmm(s.date))+" · "+
+        Math.round(sessVol(s)).toLocaleString("pt-BR")+" kg·rep</div>";
+      c.appendChild(r);
     });
     a.appendChild(c);
   }
+}
+function heroiOcioso(d){
+  const t=templates[d]||{name:d,ex:[]};
+  const exs=orderLikeLast(d,t.ex||[]);              // a ordem em que a sessão VAI abrir, nunca t.ex cru
+  const n=diasDe(d),ult=lastSessionFor(d);
+  const motivo=n===null?"nunca treinado":"mais parado · "+idadeTxt(n);
+  const alerta=n!==null&&n>DIAS_ALERTA;
+  const c=el("div","card");c.style.borderColor="var(--accent)";
+  c.innerHTML="<div class='row' style='gap:8px'><span class='hm-selo'>PRÓXIMO</span>"+
+      "<span style='font-size:13px;font-weight:600;color:"+(alerta?"var(--warn-tx)":"var(--muted)")+"'>"+esc(motivo)+"</span></div>"+
+    "<div class='row' style='margin:12px 0 10px;align-items:center'><div class='hm-letra'>"+esc(d)+"</div>"+
+      "<div style='min-width:0'><div style='font-weight:650;font-size:19px'>"+esc(t.name)+"</div>"+
+      "<div class='muted'>"+exs.length+(exs.length===1?" exercício":" exercícios")+(ult?" · último em "+esc(ddmm(ult.date)):"")+"</div></div></div>"+
+    exs.slice(0,3).map(e=>"<div class='hm-ex'><span class='nm'>"+esc(trimNome(e.n))+"</span><span class='muted'>"+esc(e.sr||"")+"</span></div>").join("")+
+    (exs.length>3?"<div class='muted' style='margin-top:2px'>+ "+(exs.length-3)+(exs.length-3===1?" exercício":" exercícios")+"</div>":"");
+  const b=el("button","btn-primary hm-cta","Começar treino "+esc(d));
+  b.onclick=()=>startSession(d,"heroi");
+  c.appendChild(b);
+  return c;
+}
+function tileTreino(d,falhou,origem){
+  const t=templates[d];const card=el("button","daycard hm-tile");
+  let sel;
+  if(falhou)sel="histórico não lido";
+  else{
+    const n=diasDe(d);const txt=idadeTxt(n);
+    /* "nunca treinado" é textual e SEM cor de aviso: ausência não se disfarça de "há muitos
+       dias". 10 dias = 4 letras ÷ 3 sessões/semana, um ciclo pulado daquela letra. */
+    sel=(n!==null&&n>DIAS_ALERTA)?"<b style='color:var(--warn-tx)'>"+txt+"</b>":txt;
+  }
+  card.innerHTML="<div class='big'>"+esc(d)+"</div><div style='font-weight:600;font-size:14px;margin:2px 0;line-height:1.25'>"+esc(t.name)+"</div>"+
+    "<div class='muted'>"+sel+"</div>";
+  card.setAttribute("aria-label","Começar treino "+d+", "+t.name+", "+card.lastChild.textContent);
+  card.onclick=()=>startSession(d,origem);
+  return card;
+}
+function heroiEmTreino(){
+  const nome=templates[active.day]?templates[active.day].name:active.day;
+  const pr=progresso(active);
+  const c=el("div","card");c.style.borderColor="var(--accent2)";
+  let ini="";
+  if(active.started){                               // sem carimbo, a linha some — não inventa hora
+    const min=Math.max(0,Math.floor((Date.now()-active.started)/60000));
+    const ha=min<1?"agora há pouco":min<60?"há "+min+" min":"há "+Math.floor(min/60)+" h "+String(min%60).padStart(2,"0")+" min";
+    ini="<div class='muted'>iniciado às "+fmtClock(active.started)+" · "+ha+"</div>";
+  }
+  const pct=pr.m?Math.round(pr.x/pr.m*100):0;
+  c.innerHTML="<div class='row' style='gap:8px'><span class='hm-selo anda'>EM ANDAMENTO</span></div>"+
+    "<div class='row' style='margin:12px 0 0;align-items:center'><div class='hm-letra'>"+esc(active.day)+"</div>"+
+      "<div style='min-width:0'><div style='font-weight:650;font-size:19px'>"+esc(nome)+"</div>"+ini+"</div></div>"+
+    "<div class='hm-barra' role='progressbar' aria-label='exercícios feitos' aria-valuemin='0' aria-valuemax='"+pr.m+"' aria-valuenow='"+pr.x+"'><i style='width:"+pct+"%'></i></div>"+
+    "<div class='muted' style='margin-bottom:10px'>"+pr.x+" de "+pr.m+(pr.m===1?" exercício":" exercícios")+" · "+pr.s+(pr.s===1?" série feita":" séries feitas")+"</div>";
+  const i=exercicioDoMomento(active);
+  const box=el("div","lastbox");box.style.margin="0";
+  if(i<0){
+    box.innerHTML="<div class='lbl'>AGORA</div><div class='hl'>"+(pr.m?"todos os exercícios marcados":"nenhum exercício na sessão")+"</div>"+
+      "<div class='muted' style='font-size:12px'>falta finalizar o treino</div>";
+  }else{
+    const e=active.exercises[i];
+    const feitas=completedSets({sets:e.sets||[]}),alvo=targetSets(e);
+    const mr=String(e.sr||"").match(/×\s*(\d+(?:\s*-\s*\d+)?)\b/);
+    let serie=!alvo?"série "+(feitas+1):feitas>=alvo?feitas+" de "+alvo+" séries feitas":"série "+(feitas+1)+" de "+alvo;
+    if(mr&&!(alvo&&feitas>=alvo))serie+=" · meta "+mr[1].replace(/\s+/g,"")+" reps";
+    box.innerHTML="<div class='lbl'>AGORA</div><div class='hl'>"+esc(e.n)+"</div><div class='muted' style='font-size:12px'>"+esc(serie)+"</div>";
+  }
+  c.appendChild(box);
+  const b=el("button","btn-primary hm-cta","Continuar treino →");
+  b.onclick=()=>{wantScrollActive=true;go("log");};
+  c.appendChild(b);
+  return c;
 }
 function lastSessionFor(d){const f=sessions.filter(s=>s.day===d);return f.length?f[f.length-1]:null;}
 
@@ -764,22 +897,47 @@ function weekRange(){const h=new Date();const x=new Date(h.getFullYear(),h.getMo
 /* A palavra é "registrados", não "treinos": em agosto foram 11 treinos e 9 registros no app.
    Num app cuja tese é aderência, um contador que erra pra baixo puniria justamente os dias
    em que ele treinou e não anotou — a direção mais cara. O número descreve o registro.
-   Dos cinco estados, aqui só existem três: a leitura é síncrona do localStorage (não há
-   "carregando") e um contador de uma linha não tem "parcial". Zero é zero e aparece. */
-function weekBox(){
-  const b=el("div","lastbox");
+   v1.15.0 — os sete dias ganham a letra do que foi REGISTRADO em cada um. A sessão em
+   andamento NÃO conta e NÃO pinta cheio (o Figma em treino dizia "3 de 3 ✓": contava o que
+   ainda não foi salvo, cicatriz nº 2): ela aparece em contorno no dia de hoje, e a linha de
+   baixo diz quanto vai dar ao terminar. Dia vazio é neutro — fato, não punição.
+   Estados: ilegível (diz que não veio), zero (aparece, a leitura funcionou), parcial, cheio.
+   Não há "carregando": a leitura é síncrona do localStorage. */
+const SEMLB=["S","T","Q","Q","S","S","D"], SEMNOME=["segunda","terça","quarta","quinta","sexta","sábado","domingo"];
+function semanaCard(){
+  const c=el("div","card");
   const falhou=readFailed(K.sess);
-  let hl,sub;
-  if(falhou){ hl="histórico não pôde ser lido"; sub="ver Ajustes → Diagnóstico de dados · "+falhou; }
-  else{
-    const [ini,fim]=weekRange();
-    const n=sessions.filter(s=>s.date>=ini&&s.date<=fim).length;
-    hl=n+(n===1?" registrado":" registrados")+" · meta "+weekGoal();
-    sub="conta treinos registrados neste app";
+  if(falhou){
+    c.innerHTML="<h2 style='margin:0'>Esta semana</h2>"+
+      "<div style='font-weight:600;margin-top:8px'>histórico não pôde ser lido</div>"+
+      "<div class='muted' style='margin-top:2px'>ver Ajustes → Diagnóstico de dados · "+esc(falhou)+"</div>";
+    return c;
   }
-  b.innerHTML="<div class='lbl'>ESTA SEMANA (SEG–DOM)</div><div class='hl'>"+hl+"</div>"+
-              "<div class='muted' style='font-size:12px;margin-top:2px'>"+esc(sub)+"</div>";
-  return b;
+  const [ini,fim]=weekRange(),hoje=today(),meta=weekGoal();
+  const sem=sessions.filter(s=>s.date>=ini&&s.date<=fim);
+  const n=sem.length;
+  const porDia={};sem.forEach(s=>{(porDia[s.date]=porDia[s.date]||[]).push(String(s.day));});
+  const anda=!!(active&&!isOrfa()&&active.date===hoje);
+  const p=ini.split("-"),seg=new Date(+p[0],+p[1]-1,+p[2]);
+  let dias="";
+  for(let i=0;i<7;i++){
+    const x=new Date(seg);x.setDate(seg.getDate()+i);
+    const ds=x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0");
+    const L=porDia[ds]||[],eHoje=ds===hoje;
+    let cls="hm-dia",txt="",lbl=SEMNOME[i]+(eHoje?", hoje":"");
+    if(L.length){cls+=" cheio"+(L.length>1?" duas":"");txt=L.join("");lbl+=", treino "+L.join(" e ")+" registrado";}
+    else if(eHoje&&anda){cls+=" anda";txt=String(active.day);lbl+=", treino "+active.day+" em andamento, ainda não registrado";}
+    else{txt=eHoje?String(x.getDate()):"";lbl+=", nada registrado";}
+    if(eHoje)cls+=" hoje";
+    dias+="<div><div class='lb' aria-hidden='true'>"+SEMLB[i]+"</div><div class='"+cls+"' role='img' aria-label='"+esc(lbl)+"'>"+esc(txt)+"</div></div>";
+  }
+  const pe=anda?"ao terminar, "+(n+1)+" de "+meta+" · a contagem só muda quando o treino for salvo"
+          :(n>=meta?"Meta batida":"Falta "+(meta-n)+" para a meta")+" · conta os treinos registrados neste app";
+  c.innerHTML="<div class='row'><h2 style='margin:0;flex:1'>Esta semana</h2>"+
+      "<span style='font-weight:700;font-size:17px;color:var(--accent-tx)'>"+n+" de "+meta+"</span></div>"+
+    "<div class='hm-semana'>"+dias+"</div>"+
+    "<div class='muted'>"+esc(pe)+"</div>";
+  return c;
 }
 function sessVol(s){return s.exercises.reduce((a,e)=>a+setVol(e.sets),0);}
 
@@ -820,11 +978,17 @@ function orderLikeLast(d,exs){
     .map(x=>x.e);
 }
 
-function startSession(d){
+/* v1.15.0 — `origem` = de onde ele começou: "heroi" (o botão do treino recomendado) ou
+   "outro" (um tile, com o herói na tela). Vai pra sessão salva como `inicio`, campo aditivo:
+   é a única forma de saber se a regra do "mais parado" é a dele (meta: ≥ 60% pelo herói).
+   Sem herói na tela (erro, órfã, histórico ilegível) o campo NÃO é gravado — ausência, não
+   um "outro" que contaria contra a regra sem ela ter sido mostrada. */
+function startSession(d,origem){
   if(active && !confirm("Já existe um treino em andamento. Descartar e começar "+d+"?"))return;
   const t=templates[d];
   active={day:d,date:today(),ciclo:cfg.ciclo,plano:cfg.plano,started:Date.now(),
     exercises:orderLikeLast(d,t.ex).map(e=>({n:trimNome(e.n),sr:e.sr,rest:e.rest,mvw:e.mvw,notes:e.notes,sets:[]}))};  // v1.14.1: template sujo não suja a sessão
+  if(origem==="heroi"||origem==="outro")active.inicio=origem;
   ensureIds(active);
   save(K.active,active);go("log");
 }
@@ -857,8 +1021,7 @@ function renderLog(a){
      exercício do momento. Isto é rolagem, não uma quarta regra de ordenação. */
   if(wantScrollActive){
     wantScrollActive=false;
-    let alvo=(activeIdx>=0&&!active.exercises[activeIdx].done)?activeIdx
-            :active.exercises.findIndex(e=>!e.done);
+    let alvo=exercicioDoMomento(active);   // v1.15.0: a mesma regra do AGORA da Home
     const card=nodes[alvo];
     /* Sem `behavior:"smooth"` de propósito: medido no navegador, o scroll suave é
        descartado quando o documento está `hidden` — que é exatamente o caso de uma aba
@@ -2509,13 +2672,28 @@ function doImport(){
    continua em showMarkdown(), como cópia pra área de transferência. */
 
 /* ============ VERSÃO ============ */
-const APP_VERSION="1.14.2";
-const APP_RELEASED="2026-09-04";
+const APP_VERSION="1.15.0";
+const APP_RELEASED="2026-09-30";
 /* Versionamento semântico MAJOR.MINOR.PATCH
    MAJOR = muda o formato dos dados (backup/restore incompatível)
    MINOR = funcionalidade nova, dados compatíveis
    PATCH = correção sem mudar comportamento                        */
 const APP_CHANGELOG=[
+ {v:"1.15.0",d:"2026-09-30",c:[
+   "Home nova no celular: o treino recomendado ocupa o topo, com um botão só — abrir, um toque, treinando",
+   "A recomendação é a regra que já existia (o mais parado; nunca treinado primeiro) — ela não mudou, ganhou um lugar",
+   "O motivo fica sempre escrito: 'nunca treinado', 'mais parado · há N dias'; laranja só acima de 10 dias",
+   "Os 3 exercícios mostrados estão na ordem em que a sessão vai abrir (a da última sessão completa), não na do template",
+   "Os outros treinos viram tiles de um toque logo abaixo, com a idade de cada um",
+   "A semana mostra os sete dias com a letra do que foi registrado em cada um; dia vazio é neutro, não falta",
+   "Treino em andamento não conta na semana nem pinta o dia: aparece em contorno, e a linha diz quanto vai dar ao terminar",
+   "Com treino em andamento o topo vira progresso: hora de início, exercícios feitos, séries, e o exercício de agora",
+   "Exercícios feitos e séries saem de uma função só (progresso), a mesma da barra da aba de treino: as duas telas não podem discordar",
+   "A barra da aba de treino passa a contar exercício marcado como feito com série, não 'exercício com alguma linha' — o número pode descer",
+   "Histórico ilegível tira a recomendação: sem histórico, apontar 'o mais parado' seria inventar",
+   "Recentes mostra 3 treinos e leva ao Histórico; o botão MD saiu da Home e continua no detalhe da sessão",
+   "Ao voltar ao app num dia novo, a Home se refaz: segunda de manhã a semana começa vazia",
+   "Novo campo opcional na sessão salva: inicio = heroi | outro, só quando havia recomendação na tela. Backup continua compatível"]},
  {v:"1.14.2",d:"2026-09-04",c:[
    "Campo de carga aceita vírgula: digitar 7,5 gravava 75, dez vezes o peso, sem aviso",
    "A causa era o type=number do HTML, que só reconhece ponto como separador — no teclado pt-BR a vírgula era descartada e os dígitos se juntavam",
@@ -2721,6 +2899,16 @@ const APP_CHANGELOG=[
 /* ============ BOOT ============ */
 requestPersist();applyTheme();trackKeyboard();
 if(active)wantScrollActive=true;   // P4.7: reload no meio do treino volta pro exercício do momento
+/* v1.15.0 — app aberto de domingo pra segunda: ao voltar ao primeiro plano com o dia trocado,
+   a Home se refaz (semana zerada, sessão de ontem vira órfã). Com treino em andamento ela se
+   refaz sempre, pro "há N min" do herói não ficar parado. Só na Home: nas outras abas um
+   re-render no meio do toque é exatamente o que o P4.7 proíbe. */
+function voltouAoPrimeiroPlano(){
+  if(document.visibilityState!=="visible"||tab!=="home")return;
+  if(homeDia!==today()||active)render();
+}
+document.addEventListener("visibilitychange",voltouAoPrimeiroPlano);
+window.addEventListener("pageshow",voltouAoPrimeiroPlano);
 render();
 </script>
 </body>
