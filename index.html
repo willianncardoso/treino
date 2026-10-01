@@ -955,13 +955,15 @@ function execOrderOf(sess){
 // Última sessão REPRESENTATIVA do dia: a mais recente que cobriu pelo menos 60%
 // dos exercícios do template. Evita que um treino abortado (ex.: 1 exercício)
 // bagunce a ordem de todos os próximos.
+/* v1.16.0 — a régua saiu pra função própria porque a confirmação (P8.1) usa a MESMA, sobre
+   outro recorte de sessões: duas cópias do 60 % seriam duas réguas no primeiro ajuste. */
+function refMin(d){const t=templates[d];return t?Math.max(2,Math.ceil((t.ex||[]).length*0.6)):null;}
+function nExComSerie(s){return (s.exercises||[]).filter(e=>(e.sets||[]).length).length;}
 function refSessionFor(d){
-  const t=templates[d]; if(!t) return null;
-  const min=Math.max(2,Math.ceil((t.ex||[]).length*0.6));
+  const min=refMin(d); if(min===null) return null;
   const f=sessions.filter(s=>s.day===d);
   for(let i=f.length-1;i>=0;i--){
-    const n=(f[i].exercises||[]).filter(e=>(e.sets||[]).length).length;
-    if(n>=min) return f[i];
+    if(nExComSerie(f[i])>=min) return f[i];
   }
   return null;
 }
@@ -1292,14 +1294,14 @@ function finishSession(){
   sessions.push(sess);
   if(!save(K.sess,sessions)){
     sessions.pop();
-    pendingSave={sess:sess,v:v,res:{ok:false,msg:"o navegador recusou a gravação — veja Ajustes → Diagnóstico de dados"}};
+    pendingSave={sess:sess,v:v,res:{ok:false,kind:"save",msg:"o navegador recusou a gravação — veja Ajustes → Diagnóstico de dados"}};
     go("save");return;
   }
   const relido=load(K.sess,null);                  // prova de que foi gravado mesmo
   if(!Array.isArray(relido)||relido.length!==antes+1){
     logIO("readback-fail",K.sess,"esperado "+(antes+1)+" treinos, releitura trouxe "+(Array.isArray(relido)?relido.length:"nada"));
     sessions.pop();
-    pendingSave={sess:sess,v:v,res:{ok:false,msg:"o armazenamento não confirmou a gravação"}};
+    pendingSave={sess:sess,v:v,res:{ok:false,kind:"readback",msg:"o armazenamento não confirmou a gravação"}};
     go("save");return;
   }
   logIO("ok",K.sess,"treino "+sess.day+" "+sess.date+" · "+v.stats.sets+" séries · "+v.stats.vol+" kg·rep",
@@ -1310,24 +1312,34 @@ function finishSession(){
 }
 
 /* ---------- CONFIRMAÇÃO DE SALVAMENTO ---------- */
+/* v1.16.0 — P8.1. Ordem: título · status · avisos · números comparados · BACKUP · conteúdo
+   salvo (aberto, série a série — cicatriz nº 2) · ações. O backup subiu porque é a única
+   apólice contra o iOS apagar o Safari, e até aqui a tela nunca dizia que ele estava atrasado. */
 function renderSave(a){
   const P=pendingSave;
   if(!P){go("home");return;}
   const sess=P.sess,v=P.v,res=P.res,ok=!!(res&&res.ok);
+  const tpl=templates[sess.day];
 
   a.appendChild(el("div","row","<div style='flex:1'><h1>"+(ok?"Treino salvo":"Não foi salvo")+
-    "</h1><div class='muted'>Treino "+esc(sess.day)+" · "+esc(sess.date)+"</div></div>"));
+    "</h1><div class='muted'>Treino "+esc(sess.day)+(tpl?" · "+esc(tpl.name):"")+" · "+esc(ddmm(sess.date))+"</div></div>"));
 
   const st=el("div","card");
   st.style.borderColor=ok?"var(--accent)":"var(--danger-tx)";
-  if(ok){
-    st.innerHTML="<div style='font-weight:700;color:var(--accent-tx)'>✓ Gravado e conferido por releitura</div>"+
-      "<div class='muted' style='margin-top:4px'>O armazenamento devolveu <b>"+res.total+"</b> treinos no histórico.</div>";
+  if(ok){                     // o número é o da RELEITURA, não sessions.length
+    st.innerHTML="<div style='font-weight:700;color:var(--accent-tx)'>✓ conferido por releitura · "+
+      res.total+(res.total===1?" treino":" treinos")+" no histórico</div>";
   }else{
+    /* "Nada foi gravado" só onde é verdade: validação recusou (nem tentou) ou save()===false.
+       No readback o save() devolveu true e a releitura não bateu — ninguém sabe o que ficou. */
+    const leitura=!!(res&&res.kind==="readback");
     st.innerHTML="<div style='font-weight:700;color:var(--danger-tx)'>✕ "+
-      esc(res?res.msg:"Sessão incompleta — nada foi gravado")+"</div>"+
+      esc(res?res.msg:"Sessão incompleta")+"</div>"+
       (v.erros.length?"<ul style='margin:8px 0 0 18px;padding:0'>"+
-        v.erros.map(x=>"<li>"+esc(x)+"</li>").join("")+"</ul>":"");
+        v.erros.map(x=>"<li>"+esc(x)+"</li>").join("")+"</ul>":"")+
+      "<div style='margin-top:8px;font-weight:650'>"+(leitura
+        ?"A sessão continua aberta."   // o título acima já diz que o armazenamento não confirmou
+        :"Nada foi gravado neste aparelho.")+"</div>";
   }
   a.appendChild(st);
 
@@ -1338,34 +1350,41 @@ function renderSave(a){
     a.appendChild(w);
   }
 
-  // conteúdo REAL, não um toast genérico
+  if(ok){
+    a.appendChild(numerosSalvo(sess,v));
+    const bkc=el("div","card");bkc.id="bkCard";
+    const bkTopo=el("div");bkc.appendChild(bkTopo);
+    const bkh=el("div");
+    bkh.onBk=()=>backupTopo(bkc,bkTopo);   // o card se repinta junto do bloco: backup feito vira "hoje" sem recarregar
+    renderBackupBlock(bkh);bkc.appendChild(bkh);
+    a.appendChild(bkc);
+  }
+
+  // conteúdo REAL, não um toast genérico — aberto, sempre
   const c=el("div","card");
   c.appendChild(el("h3",null,ok?"Conteúdo salvo":"Conteúdo que seria salvo"));
-  const g=el("div","row");g.style.cssText="gap:18px;flex-wrap:wrap;margin-bottom:6px";
-  [["EXERCÍCIOS",v.stats.exercicios],["SÉRIES",v.stats.sets],
-   ["VOLUME",(v.stats.vol||0)+" kg·rep"],["DURAÇÃO",v.stats.dur?v.stats.dur+" min":"—"]]
-   .forEach(function(p){const b=el("div");
-     b.innerHTML="<div class='sb-lbl'>"+p[0]+"</div><div style='font-weight:700;font-variant-numeric:tabular-nums'>"+p[1]+"</div>";
-     g.appendChild(b);});
-  c.appendChild(g);
+  if(!ok){                    // na falha os números ficam aqui, sem comparação (nada foi salvo)
+    const g=el("div","row");g.style.cssText="gap:18px;flex-wrap:wrap;margin-bottom:6px";
+    const dm=durMin(sess);
+    [["EXERCÍCIOS",v.stats.exercicios],["SÉRIES",v.stats.sets],
+     ["VOLUME",v.stats.vol?fmtMil(v.stats.vol)+" kg·rep":"sem carga"],["DURAÇÃO",dm?dm+" min":"não registrada"]]
+     .forEach(function(p){const b=el("div");
+       b.innerHTML="<div class='sb-lbl'>"+p[0]+"</div><div style='font-weight:700;font-variant-numeric:tabular-nums'>"+p[1]+"</div>";
+       g.appendChild(b);});
+    c.appendChild(g);
+  }
   sess.exercises.forEach(e=>{
     const r=el("div");r.style.cssText="padding:8px 0;border-top:1px solid var(--border)";
     r.innerHTML="<div style='font-weight:600'>"+esc(e.n)+"</div>"+
-      "<div class='muted' style='font-size:13px;font-variant-numeric:tabular-nums'>"+esc(fmtSets(e.sets))+"</div>";
+      "<div class='muted' style='font-size:13px;font-variant-numeric:tabular-nums'>"+esc(fmtSetsSalvo(e.sets))+"</div>";
     c.appendChild(r);});
   a.appendChild(c);
 
-  if(ok){                     // o backup precisa de bloco próprio: é ele que se reescreve
-    const bkc=el("div","card");
-    bkc.appendChild(el("h3",null,"Backup pro vault"));
-    const bkh=el("div");renderBackupBlock(bkh);bkc.appendChild(bkh);
-    a.appendChild(bkc);
-  }
   const bar=el("div","row wrap");
   if(ok){
-    const md=el("button","btn-blue","📋 Markdown");md.onclick=()=>showMarkdown(sess);
     const hm=el("button","btn-ghost","Início");hm.onclick=()=>{pendingSave=null;go("home");};
-    bar.appendChild(md);bar.appendChild(hm);
+    const md=el("button","btn-blue","📋 Markdown");md.onclick=()=>showMarkdown(sess);
+    bar.appendChild(hm);bar.appendChild(md);
   }else{
     const vo=el("button","btn-primary","← Voltar e corrigir");
     vo.onclick=()=>{pendingSave=null;go(active?"log":"home");};
@@ -1373,10 +1392,96 @@ function renderSave(a){
     bar.appendChild(vo);bar.appendChild(dg);
   }
   a.appendChild(bar);
-  /* O parágrafo que ficava aqui prometia "~150 KB" e chamava ~30 bytes de falha do iOS
-     (v1.3.2 tirou o mito). Agora o número não é promessa: sai do próprio arquivo, depois
-     do export, dentro do bloco de backup acima. */
   a.appendChild(el("div",null,"<div style='height:110px'></div>"));
+}
+function fmtMil(n){return Math.round(n).toLocaleString("pt-BR");}
+/* Série sem carga (Dips, peso do corpo) nunca vira "0kg" nem "?kg": é reps. Só nesta tela —
+   o fmtSets do Markdown e do Histórico não foi tocado. */
+function semCarga(st){return !(parseFloat(String(st.w==null?"":st.w).replace(",","."))>0);}
+function fmtSetsSalvo(sets){
+  if(sets.length&&sets.every(semCarga))return sets.map(st=>st.r||"?").join(" · ")+" reps";
+  return sets.map(st=>semCarga(st)?(st.r||"?")+" reps":st.w+"kg×"+(st.r||"?")).join(" · ");
+}
+/* Comparação com a última sessão REPRESENTATIVA da mesma letra ANTERIOR à salva — a mesma
+   régua de refSessionFor (refMin). Atenção: aqui a sessão já está em `sessions`; ela própria
+   e o que vier depois dela ficam de fora. Devolve {ref} ou {motivo}. */
+function refAnterior(sess){
+  const d=sess.day,min=refMin(d),M=templates[d]?(templates[d].ex||[]).length:0;
+  if(min===null)return {motivo:"sem o modelo do treino "+d+" para medir — sem comparação"};
+  const n=nExComSerie(sess);
+  if(n<min)return {motivo:"treino parcial ("+n+" de "+M+" exercícios) — sem comparação"};
+  const i=sessions.indexOf(sess);
+  const ant=(i<0?sessions:sessions.slice(0,i)).filter(s=>s.day===d);
+  if(!ant.length)return {motivo:"primeiro treino "+d+" registrado neste app: nada para comparar"};
+  for(let k=ant.length-1;k>=0;k--)if(nExComSerie(ant[k])>=min)return {ref:ant[k]};
+  return {motivo:"sem treino "+d+" completo anterior para comparar"};
+}
+/* Texto da comparação: seta não, cor de juízo também não — mais volume ou menos tempo não é
+   "bom" por definição (spec P8.1, decisão 11). */
+function cmpTxt(a,b,un,dt){
+  const d=Math.round(a)-Math.round(b);
+  if(d===0)return "= igual a "+dt;
+  return (d>0?"+":"−")+fmtMil(Math.abs(d))+un+" vs "+dt;
+}
+function numerosSalvo(sess,v){
+  const wrap=el("div");wrap.style.marginBottom="14px";
+  const R=refAnterior(sess),ref=R.ref,dt=ref?ddmm(ref.date):"";
+  const dur=durMin(sess),vol=sessVol(sess),nEx=nExComSerie(sess);
+  const nSets=sess.exercises.reduce((x,e)=>x+e.sets.length,0);
+  const linhas={dur:"",vol:"",sets:"",ex:""};
+  if(ref){
+    const dr=durMin(ref);
+    linhas.dur=(dur==null)?"sem duração no treino de "+ddmm(sess.date)
+              :(dr==null)?"sem duração no treino de "+dt:cmpTxt(dur,dr," min",dt);
+    const vr=sessVol(ref);
+    linhas.vol=(!vol)?"":(!vr)?"sem carga no treino de "+dt:cmpTxt(vol,vr,"",dt);
+    linhas.sets=cmpTxt(nSets,ref.exercises.reduce((x,e)=>x+(e.sets||[]).length,0),"",dt);
+    const A=new Set(sess.exercises.filter(e=>e.sets.length).map(e=>e.n));
+    const B=new Set((ref.exercises||[]).filter(e=>(e.sets||[]).length).map(e=>e.n));
+    const comum=[...A].filter(x=>B.has(x)).length,iguais=comum===A.size&&comum===B.size;
+    linhas.ex=iguais?"= igual a "+dt
+            :(A.size===B.size)?comum+" de "+A.size+" em comum com "+dt
+            :cmpTxt(A.size,B.size,"",dt)+" · "+comum+" de "+A.size+" em comum";
+  }
+  const g=el("div","grid2");
+  [["DURAÇÃO",dur!=null?dur+" min":"não registrada",linhas.dur],
+   ["VOLUME",vol?fmtMil(vol):"sem carga",linhas.vol,vol?"kg·rep":""],
+   ["SÉRIES",String(nSets),linhas.sets],
+   ["EXERCÍCIOS",String(nEx),linhas.ex]].forEach(p=>{
+    const t=el("div","card");t.style.cssText="margin:0;padding:12px 14px";
+    t.innerHTML="<div class='sb-lbl'>"+p[0]+"</div>"+
+      "<div style='font-weight:750;font-size:22px;font-variant-numeric:tabular-nums;line-height:1.25'>"+esc(p[1])+
+        (p[3]?" <span class='muted' style='font-weight:500'>"+p[3]+"</span>":"")+"</div>"+
+      (p[2]?"<div class='muted' style='font-variant-numeric:tabular-nums;margin-top:2px'>"+esc(p[2])+"</div>":"");
+    g.appendChild(t);});
+  wrap.appendChild(g);
+  wrap.appendChild(el("div","muted",ref?"Comparado com o treino "+esc(sess.day)+" de "+esc(dt)+".":esc(R.motivo)));
+  wrap.lastChild.style.marginTop="8px";
+  return wrap;
+}
+/* Idade do backup: cfg.lastBackup × today(). ≥ 10 dias → âmbar (decisão 7 do Will). Sem
+   registro e com treinos → âmbar. O rótulo é "entregue": o app só sabe que entregou o arquivo
+   ao iOS, não que ele chegou ao iCloud (cicatriz nº 3). */
+const BK_ALERTA=10;
+function backupIdade(){
+  const lb=cfg.lastBackup;
+  if(!lb)return sessions.length?{alerta:true,txt:"nenhum backup registrado neste aparelho"}:{alerta:false,txt:"nenhum backup registrado neste aparelho"};
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(lb)))return {alerta:true,txt:"data do último backup ilegível ("+String(lb).slice(0,20)+")"};
+  const n=daysSince(lb);
+  if(n<0)return {alerta:false,n:n,txt:"último backup entregue em "+ddmm(lb)+" (data à frente do relógio)"};
+  return {alerta:n>=BK_ALERTA,n:n,txt:n===0?"hoje":n===1?"ontem":"há "+n+" dias"};
+}
+function backupTopo(card,host){
+  const I=backupIdade();
+  card.style.borderColor=I.alerta?"var(--warn-tx)":"";
+  const quando=I.n!=null&&I.n>=0;     // idade em dias: cabe no título; o resto é frase
+  const titulo=I.alerta?"Falta guardar o backup"+(quando?" · "+I.txt:""):"Backup pro vault";
+  const sub=quando?(I.alerta?"último backup entregue em "+ddmm(cfg.lastBackup)
+                            :"último backup entregue "+I.txt+(I.n>1?" ("+ddmm(cfg.lastBackup)+")":""))
+              :I.txt;
+  host.innerHTML="<h3 style='margin:0 0 4px"+(I.alerta?";color:var(--warn-tx)":"")+"'>"+esc(titulo)+"</h3>"+
+    "<div class='muted' style='font-variant-numeric:tabular-nums'>"+esc(sub)+"</div>"+
+    "<div style='margin:8px 0 12px'>Sem ele, este treino só existe neste iPhone.</div>";
 }
 /* Conteúdo real do backup, sem abrir o arquivo: o que a tela promete tem que ser
    o que o export leva. */
@@ -1398,6 +1503,7 @@ let bkState={phase:"idle"};   // idle | busy | done | abort | fail
 
 function renderBackupBlock(host){
   host.innerHTML="";
+  if(host.onBk)host.onBk();             // v1.16.0: cabeçalho de idade da confirmação acompanha cada estado
   const st=backupStats(), S=bkState;
   /* P1.10 — cicatriz nº 2 aplicada ao lugar certo: a confirmação mostra o conteúdo real
      E o que não é conteúdo. O bloco anunciava "81 treinos · 1465 séries" com a mesma
@@ -2672,13 +2778,26 @@ function doImport(){
    continua em showMarkdown(), como cópia pra área de transferência. */
 
 /* ============ VERSÃO ============ */
-const APP_VERSION="1.15.0";
+const APP_VERSION="1.16.0";
 const APP_RELEASED="2026-09-30";
 /* Versionamento semântico MAJOR.MINOR.PATCH
    MAJOR = muda o formato dos dados (backup/restore incompatível)
    MINOR = funcionalidade nova, dados compatíveis
    PATCH = correção sem mudar comportamento                        */
 const APP_CHANGELOG=[
+ {v:"1.16.0",d:"2026-09-30",c:[
+   "Confirmação ao finalizar reorganizada: status, avisos, números, backup e, aberta logo abaixo, a lista do que foi salvo série a série",
+   "O status diz quantos treinos a releitura devolveu: '✓ conferido por releitura · N treinos no histórico'",
+   "Duração, volume, séries e exercícios vêm comparados com o último treino completo da mesma letra (a mesma régua de 60% que ordena a sessão)",
+   "A comparação não tem cor: mais volume ou menos tempo não é 'bom' por definição; quando os exercícios mudaram, diz quantos estão em comum",
+   "Sem comparação quando não há base, e a tela diz por quê: primeiro treino da letra, treino parcial, ou nenhum anterior completo",
+   "A duração passa a ser a mesma do Histórico (para na última série quando o 'finalizar' veio muito depois)",
+   "Card de backup logo abaixo dos números, com a idade do último backup entregue; a partir de 10 dias ele fica âmbar: 'Falta guardar o backup'",
+   "Sem backup registrado neste aparelho e com treinos, o card também fica âmbar. Backup feito na própria tela volta a 'hoje' na hora",
+   "'Entregue', não 'no iCloud': o app só sabe que entregou o arquivo ao iOS",
+   "Exercício sem carga aparece como reps ('10 · 10 · 9 reps'), nunca '0kg' nem '?kg'",
+   "Na falha, 'Nada foi gravado neste aparelho' só quando é verdade; se a releitura não bateu, a tela diz que o armazenamento não confirmou e que a sessão continua aberta",
+   "Formato do backup e da sessão salva iguais aos da v1.15.0"]},
  {v:"1.15.0",d:"2026-09-30",c:[
    "Home nova no celular: o treino recomendado ocupa o topo, com um botão só — abrir, um toque, treinando",
    "A recomendação é a regra que já existia (o mais parado; nunca treinado primeiro) — ela não mudou, ganhou um lugar",
