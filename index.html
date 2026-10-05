@@ -227,6 +227,23 @@ body.wide .histchart{position:sticky;top:18px}
 .sb-rest>div:first-child{min-width:0;flex:1}
 /* #3b82f6 como TEXTO sobre branco dá 3,7:1; no claro o link azul escurece (6,7:1). */
 body.light .tr-sec button.az,body.light button.az{color:#1d4ed8}
+/* v1.19.0 — nota de gosto (P10.1). Medidas do Figma (página "Nota de gosto e C5", 48:52):
+   botões de 56 px, raio 12, vão 8, fundo surface2. Selecionado: borda 2 px + fundo verde a 12 % +
+   palavra em negrito — nunca só cor. A borda usa --accent-tx: #22c55e sobre branco dá 2,3:1, abaixo
+   dos 3:1 de borda; no escuro os dois valores são o mesmo. O padding cai 1 px no selecionado para
+   a borda de 2 px não mexer na altura. */
+.gosto{margin-top:12px}
+.gosto .gq{font-size:13px;font-weight:600;margin-bottom:8px}
+.gosto .gb{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.gosto .gb button{min-height:56px;padding:8px 4px;border-radius:12px;background:var(--surface2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:13px;color:var(--text);line-height:1.2}
+.gosto .gb .gf{font-size:20px;line-height:1}
+:root{--gsel:#16301f}body.light{--gsel:#e4f7eb}   /* verde a 12 %: o valor do Figma sobre o card escuro; no claro, a mesma mistura sobre o branco */
+.gosto .gb button[aria-pressed="true"]{border:2px solid var(--accent-tx);padding:7px 3px;background:var(--gsel);color:var(--accent-tx);font-weight:700}
+.gosto .gh{font-size:11.5px;margin-top:8px}
+.exdone .gf{font-size:16px;flex:0 0 auto}
+.salvo-ex .cab{display:flex;align-items:baseline;gap:8px}
+.salvo-ex .cab .nm{font-weight:600;flex:1;min-width:0}
+.salvo-ex .cab .nt{font-size:12.5px;font-weight:600;white-space:nowrap;flex:0 0 auto}
 </style>
 </head>
 <body>
@@ -1453,9 +1470,12 @@ function exLinha(e,ei){
     if(pulado)d.style.borderLeftColor="var(--muted)";
     const m=melhorSerie(feitasR);
     const sm=pulado?"pulado":plural(feitasR.length,"série","séries")+(m?" · "+(m.carga?m.txt:m.maxR+" reps"):"");
+    /* v1.19.0 — a face da nota no fim do resumo; sem nota, nada (quem diz "sem nota" é a confirmação). */
+    const g=!pulado&&gostoValido(e.gosto)?GOSTO[e.gosto]:null;
     d.innerHTML="<span class='ck'"+(pulado?" style='color:var(--muted)'":"")+">"+(pulado?"↷":"✓")+"</span>"+
-      "<span class='nm'>"+esc(e.n)+"</span><span class='sm'>"+esc(sm)+"</span>";
-    d.setAttribute("aria-label",e.n+", "+(pulado?"pulado":"feito, "+sm)+". Abrir");
+      "<span class='nm'>"+esc(e.n)+"</span><span class='sm'>"+esc(sm)+"</span>"+
+      (g?"<span class='gf' aria-hidden='true'>"+g.f+"</span>":"");
+    d.setAttribute("aria-label",e.n+", "+(pulado?"pulado":"feito, "+sm)+(g?", nota: "+g.c:"")+". Abrir");
   }else{
     const alvo=targetSets(e),fe=seriesFeitas(e);
     const partes=[];if(e.sr)partes.push(e.sr);
@@ -1513,6 +1533,51 @@ function montaAcoes(box,e,ei){
   if(A.sec.length){const r=el("div","row tr-sec");
     A.sec.forEach(([t,fn,cl])=>{const x=el("button","btn-sm"+(cl?" "+cl:""),esc(t));x.onclick=fn;r.appendChild(x);});
     box.appendChild(r);}
+  if(mostraGosto(e,ei))box.appendChild(notaGosto(e));
+}
+/* ---------- v1.19.0 — Nota de gosto (P10.1) ----------
+   `gosto: 1|2|3` no exercício da sessão em andamento; ausente = sem nota. NUNCA 0: um "Ok"=0 seria
+   lido como ausência por qualquer `if(e.gosto)` (cicatriz nº 1 de trás pra frente). */
+const GOSTO={1:{f:"😕",t:"Não gosto",c:"não gosto"},2:{f:"😐",t:"Ok",c:"ok"},3:{f:"🙂",t:"Gosto",c:"gosto"}};
+function gostoValido(v){return v===1||v===2||v===3;}
+/* Onde a linha aparece — spec P10 (b): (1) descanso ENTRE EXERCÍCIOS deste exercício, (2) exercício
+   feito reaberto (`✓ Feito · recolher`), nunca pulado. Só LÊ o estado do descanso: o restTimer
+   persistido cobre o reload no meio da pausa, antes de o resumeRest religar o swId. Nada aqui
+   escreve em swId, swStart, restTimer nem chama markLap/startRest/stopRest. */
+function mostraGosto(e,ei){
+  const descansando=(swId&&swExIdx===ei)||!!(active&&active.restTimer&&active.restTimer.i===ei);
+  if(descansando)return descansoEntre(e);
+  /* Feito com série de verdade. `seriesFeitas>0` cobre o opcional sem alvo marcado como feito
+     depois de um `Próxima série`, que deixa uma linha pré-preenchida aberta (sem ela, o caminho 2
+     nunca apareceria justo nos opcionais do E). Pulado (nenhuma série) nunca. */
+  if(!e.done)return false;
+  return seriesFeitas(e)>0||(linhaAberta(e)<0&&(e.sets||[]).some(temReps));
+}
+function notaGosto(e){
+  const g=el("div","gosto");g.setAttribute("role","group");g.setAttribute("aria-label","Quanto você gosta deste exercício?");
+  g.appendChild(el("div","gq","Quanto você gosta deste exercício?")).setAttribute("aria-hidden","true");
+  const gb=el("div","gb");
+  [1,2,3].forEach(v=>{
+    const G=GOSTO[v],sel=e.gosto===v;
+    const b=el("button","btn-ghost","<span class='gf' aria-hidden='true'>"+G.f+"</span><span>"+G.t+"</span>");
+    b.setAttribute("aria-pressed",sel?"true":"false");b.setAttribute("aria-label",G.t+" de "+e.n);
+    b.onclick=()=>{
+      const antes=e.gosto;
+      if(e.gosto===v)delete e.gosto;else e.gosto=v;   // tocar no selecionado apaga o campo — não vira 0 nem null
+      /* save() direto, não persistActive(): a nota que não gravou é desfeita na tela e dita, em vez
+         de aparecer selecionada sem existir no armazenamento. */
+      if(!save(K.active,active)){
+        if(antes===undefined)delete e.gosto;else e.gosto=antes;
+        toast("não consegui gravar a nota — ver Diagnóstico");
+      }
+      const novo=notaGosto(e);g.replaceWith(novo);   // repinta só a linha: cronômetro e barra seguem como estavam
+      const f=novo.querySelectorAll(".gb button")[v-1];if(f)f.focus({preventScroll:true});
+    };
+    gb.appendChild(b);
+  });
+  g.appendChild(gb);
+  g.appendChild(el("div","muted gh","opcional · tocar de novo apaga · não mexe no descanso"));
+  return g;
 }
 
 function exCard(e,ei,isActive){
@@ -1647,7 +1712,7 @@ function finishSession(){
   logIO("ok",K.sess,"treino "+sess.day+" "+sess.date+" · "+v.stats.sets+" séries · "+v.stats.vol+" kg·rep",
         JSON.stringify(sessions).length);
   active=null;try{localStorage.removeItem(K.active);}catch(e){}
-  pendingSave={sess:sess,v:v,res:{ok:true,total:relido.length}};
+  pendingSave={sess:sess,v:v,res:{ok:true,total:relido.length},rel:relido[relido.length-1]};   // v1.19.0: a nota da confirmação vem daqui
   go("save");
 }
 
@@ -1713,11 +1778,27 @@ function renderSave(a){
        g.appendChild(b);});
     c.appendChild(g);
   }
-  sess.exercises.forEach(e=>{
-    const r=el("div");r.style.cssText="padding:8px 0;border-top:1px solid var(--border)";
-    r.innerHTML="<div style='font-weight:600'>"+esc(e.n)+"</div>"+
+  /* v1.19.0 — a nota de gosto de cada exercício. Salvo: vem da RELEITURA (P.rel), como as séries
+     provam a gravação; não salvo: do que seria salvo. Ausência é escrita ("sem nota"), nunca "ok".
+     Sem controle de edição: o pipeline compara só peso × reps e perderia uma nota mudada depois. */
+  const fonte=ok?P.rel:sess;
+  let comNota=0;
+  sess.exercises.forEach((e,i)=>{
+    const re=fonte&&Array.isArray(fonte.exercises)?fonte.exercises[i]:null;
+    let nt;
+    if(!re||re.n!==e.n)nt="<span class='nt' style='color:var(--warn-tx)'>nota não relida</span>";
+    else if(re.gosto===undefined)nt="<span class='nt muted' style='font-weight:400'>sem nota</span>";
+    else if(gostoValido(re.gosto)){comNota++;nt="<span class='nt'>"+GOSTO[re.gosto].f+" "+GOSTO[re.gosto].c+"</span>";}
+    else nt="<span class='nt' style='color:var(--warn-tx)'>nota inválida: "+esc(String(re.gosto))+"</span>";
+    const r=el("div","salvo-ex");r.style.cssText="padding:8px 0;border-top:1px solid var(--border)";
+    r.innerHTML="<div class='cab'><span class='nm'>"+esc(e.n)+"</span>"+nt+"</div>"+
       "<div class='muted' style='font-size:13px;font-variant-numeric:tabular-nums'>"+esc(fmtSetsSalvo(e.sets))+"</div>";
     c.appendChild(r);});
+  if(sess.exercises.length){
+    const rod=el("div","muted","nota de gosto em "+comNota+" de "+plural(sess.exercises.length,"exercício","exercícios"));
+    rod.style.cssText="padding-top:8px;border-top:1px solid var(--border);font-weight:600;font-size:12.5px";
+    c.appendChild(rod);
+  }
   a.appendChild(c);
 
   const bar=el("div","row wrap");
@@ -2965,6 +3046,7 @@ function analysisExport(){
         name:e.n,
         mvw:!!e.mvw,
         target:e.sr||null,
+        ...(gostoValido(e.gosto)?{gosto:e.gosto}:{}),   // v1.19.0: só quando há; ausente = sem nota
         sets:e.sets.map((st,i)=>({
           index:i+1,
           weightKg:numOrNull(st.w),
@@ -3141,13 +3223,20 @@ function doImport(){
    continua em showMarkdown(), como cópia pra área de transferência. */
 
 /* ============ VERSÃO ============ */
-const APP_VERSION="1.18.0";
+const APP_VERSION="1.19.0";
 const APP_RELEASED="2026-10-05";
 /* Versionamento semântico MAJOR.MINOR.PATCH
    MAJOR = muda o formato dos dados (backup/restore incompatível)
    MINOR = funcionalidade nova, dados compatíveis
    PATCH = correção sem mudar comportamento                        */
 const APP_CHANGELOG=[
+ {v:"1.19.0",d:"2026-10-05",c:[
+   "Nota de gosto por exercício: Não gosto · Ok · Gosto. Aparece no card do exercício durante o descanso entre exercícios (depois da última série) e quando você reabre um exercício feito",
+   "É opcional e não mexe no descanso: o cronômetro, a barra azul e o 'Próximo exercício' continuam iguais. Tocar de novo na nota escolhida apaga",
+   "Nunca aparece entre séries do mesmo exercício, em exercício pulado, em janela nem ao finalizar",
+   "A linha do exercício feito mostra a face da nota no fim do resumo",
+   "Confirmação: cada exercício mostra a nota relida do armazenamento, ou 'sem nota', e o rodapé diz 'nota de gosto em N de M exercícios'. Não dá para editar depois de salvo",
+   "Export para análise (gymlog) leva a nota quando há. Backup continua {templates, sessions, cfg}: o campo novo é opcional e as versões anteriores o guardam sem ler"]},
  {v:"1.18.0",d:"2026-10-05",c:[
    "Treino em andamento redesenhado: um exercício aberto por vez; os outros ficam em linha (feito ✓ com o resumo, pendente com o alvo e a última vez) e um toque abre qualquer um",
    "A lista não se mexe mais: os feitos ficam no lugar, na ordem em que a sessão abriu",
