@@ -245,6 +245,27 @@ body.light .tr-sec button.az,body.light button.az{color:#1d4ed8}
 .salvo-ex .cab{display:flex;align-items:baseline;gap:8px}
 .salvo-ex .cab .nm{font-weight:600;flex:1;min-width:0}
 .salvo-ex .cab .nt{font-size:12.5px;font-weight:600;white-space:nowrap;flex:0 0 auto}
+/* v1.21.0 — Como foi o treino? (P11.1). Medidas do Figma (página "Comentário da sessão", 55:158 e
+   55:176): título 15 px, botões de 48 px em 3 colunas com vão 8, comentário 44 px, raio 12. O
+   selecionado segue a nota de gosto (borda 2 px --accent-tx + verde a 12 % + negrito), nunca só cor.
+   `txt-sessao` é componente novo: a textarea global é monoespaçada com 200 px (Markdown/editor).
+   16 px de fonte porque abaixo disso o Safari do iOS dá zoom ao focar. */
+.sessao-card .sq{font-size:15px;font-weight:600}
+.sessao-card .sn{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.sessao-card .sn button,.sessao-card .sc-bt{min-height:48px;padding:8px 4px;border-radius:12px;background:var(--surface2);color:var(--text);font-weight:600}
+.sessao-card .sn button[aria-pressed="true"]{border:2px solid var(--accent-tx);padding:7px 3px;background:var(--gsel);color:var(--accent-tx);font-weight:700}
+.sessao-card .sc-bt{display:block;width:100%;min-height:44px;margin-top:10px}
+.sessao-card label.fld{text-align:left;text-transform:none;letter-spacing:0;font-size:12px;font-weight:600;margin:10px 0 6px}
+.txt-sessao{font-family:inherit;font-size:16px;line-height:1.4;min-height:88px;padding:11px 12px;resize:none;overflow:hidden;white-space:pre-wrap;user-select:text;-webkit-user-select:text}
+.txt-sessao:focus{outline:none;border:2px solid var(--accent-tx);padding:10px 11px}
+.sessao-card .sc-rod{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:12px;margin-top:6px}
+.sessao-card .sc-rod .muted{font-size:12px}
+.sessao-card .sc-rod .ct{font-variant-numeric:tabular-nums;white-space:nowrap}
+.salvo-como{padding-top:10px;margin-top:8px;border-top:1px solid var(--border)}
+.salvo-como .cab{display:flex;align-items:baseline;gap:8px}
+.salvo-como .cab .nm{font-weight:600;flex:1;min-width:0}
+.salvo-como .cab .nt{font-size:12.5px;font-weight:600;white-space:nowrap}
+.salvo-como .txt{margin-top:6px;padding:10px 12px;border-radius:8px;background:var(--surface2);white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;user-select:text;-webkit-user-select:text}
 </style>
 </head>
 <body>
@@ -777,7 +798,7 @@ function isDesktop(){return window.matchMedia("(min-width: 900px)").matches;}
 /* P5.12 — sair da tela de confirmação pela tabbar deixava `pendingSave` pendurado até o
    reload. Não corrompe nada (o treino já está gravado e conferido), mas é estado morto:
    quem não vai pra "save" não tem confirmação pendente. */
-function go(t){if(t!=="save")pendingSave=null;tab=t;bkState={phase:"idle"};addExOpen=false;trPainel=null;render();window.scrollTo(0,0);}  // relatório de export é do toque, não do dia
+function go(t){if(t!=="save")pendingSave=null;tab=t;bkState={phase:"idle"};addExOpen=false;trPainel=null;comentAberto=null;rascunhoOk=null;render();window.scrollTo(0,0);}  // relatório de export é do toque, não do dia
 /* P4.7: ligado só na retomada de sessão (reload e "Continuar treino →"), consumido pela
    renderLog. Nunca a cada série — a lista não pode se mexer no meio do toque. */
 let wantScrollActive=false;
@@ -959,7 +980,8 @@ function renderHome(a){
     const vh=el("button","btn-ghost btn-sm","Ver histórico →");vh.onclick=()=>go("hist");
     hd.appendChild(vh);a.appendChild(hd);
     /* 3, não 5: a Home é a porta da academia, não o Histórico. O 📋 Markdown saiu daqui e
-       continua no detalhe da sessão, no Histórico — nada se perde. */
+       continua na confirmação ao finalizar (errata v1.21.0: não existe "detalhe da sessão" no
+       Histórico — ele é por exercício e nenhuma linha de sessão abre nada). */
     const c=el("div","card");c.style.padding="4px 16px";
     sessions.slice(-3).reverse().forEach(s=>{
       const r=el("div","sess");
@@ -1215,7 +1237,7 @@ function startSession(d,origem){
   ensureIds(active);
   save(K.active,active);go("log");
 }
-function persistActive(){save(K.active,active);}
+function persistActive(){return save(K.active,active);}   // v1.21.0: devolve o resultado (o rascunho do comentário diz se guardou)
 function exDoTemplate(e){return {n:trimNome(e.n),sr:e.sr,rest:e.rest,mvw:e.mvw,notes:e.notes,sets:[]};}
 /* v1.17.0 — card "Opcionais": os `opc` do template que ainda NÃO estão na sessão (por
    trimNome), na ordem do template. Derivado a cada render: se o exercício sair da sessão, ele
@@ -1274,6 +1296,103 @@ function opcionaisCard(){
   });
   return c;
 }
+
+/* ---------- v1.21.0 — Como foi o treino? (P11.1) ----------
+   `sensacao: 1|2|3` e `comentario` (texto, 1–500) na sessão em andamento; ausente = não respondeu.
+   NUNCA 0, "" nem null: tocar no selecionado e apagar o texto REMOVEM o campo. Em `active` o texto
+   fica como foi digitado (o campo precisa do espaço do fim enquanto ele digita); o finishSession faz
+   o trim. Mora só no fim da tela de treino: nada aqui lê ou escreve swId, swStart, restTimer, nem
+   chama render(), markLap, startRest ou stopRest — repinta só o próprio card, e o texto vai pra
+   `active` a cada tecla (memória) e pro armazenamento 0,5 s depois de parar e no blur. */
+const SENSACAO={1:{t:"Ruim",c:"ruim"},2:{t:"Normal",c:"normal"},3:{t:"Bom",c:"bom"}};
+function sensacaoValida(v){return v===1||v===2||v===3;}
+const COMENT_MAX=500,COMENT_CONTADOR=400;
+let comentAberto=null;   // null = automático (aberto se já há texto) · true/false = ele tocou. O go() zera.
+let comentTimer=null;
+let rascunhoOk=null;     // último persistActive() do card: null = nada gravado por ele ainda
+function comentarioNoActive(txt){if(String(txt).trim())active.comentario=txt;else delete active.comentario;}
+function gravarRascunho(){
+  clearTimeout(comentTimer);comentTimer=null;
+  if(!active)return;
+  rascunhoOk=persistActive();
+  pintarRascunho();
+}
+function pintarRascunho(){
+  const s=$("#comentStatus");if(!s)return;
+  if(rascunhoOk===false){s.className="";s.style.color="var(--warn-tx)";s.textContent="rascunho NÃO foi guardado — ver Ajustes → Diagnóstico";}
+  else{s.className="muted";s.style.color="";
+    const tem=!!(active&&typeof active.comentario==="string"&&active.comentario.trim());
+    s.textContent=tem?"rascunho guardado neste aparelho":"";}   // campo vazio não tem rascunho a anunciar
+}
+function pintarContador(ta){
+  const ct=$("#comentCont");if(!ct)return;
+  const n=ta.value.length;ct.textContent=n>=COMENT_CONTADOR?n+"/"+COMENT_MAX:"";
+}
+function autoAltura(ta){ta.style.height="auto";ta.style.height=(ta.scrollHeight+4)+"px";}
+function repintarComoFoi(foco){
+  const old=$("#comoFoi");if(!old)return;
+  const novo=comoFoiCard();old.replaceWith(novo);
+  const ta=$("#comentTxt");if(ta)autoAltura(ta);
+  const f=foco&&novo.querySelector(foco);if(f)f.focus({preventScroll:true});
+}
+function comoFoiCard(){
+  const c=el("div","card sessao-card");c.id="comoFoi";
+  /* P5.4, como no card do exercício: tocar no próprio card (fora de campo e botão) fecha o teclado. */
+  c.addEventListener("pointerdown",ev=>{
+    if(ev.target.closest("input,select,textarea,button"))return;
+    const foco=document.activeElement;if(foco&&foco!==document.body&&foco.blur)foco.blur();
+  });
+  c.appendChild(el("div","sq","Como foi o treino?"));
+  c.appendChild(el("div","muted","opcional · seu treinador lê isto na revisão do ciclo"));
+  const g=el("div","sn");g.setAttribute("role","group");g.setAttribute("aria-label","Como foi o treino?");
+  [1,2,3].forEach(v=>{
+    const b=el("button","btn-ghost",SENSACAO[v].t);
+    b.setAttribute("aria-pressed",active.sensacao===v?"true":"false");
+    b.onclick=()=>{
+      if(active.sensacao===v)delete active.sensacao;else active.sensacao=v;   // tocar no selecionado apaga o campo
+      clearTimeout(comentTimer);comentTimer=null;                          // o texto já está em active: vai junto
+      rascunhoOk=persistActive();
+      repintarComoFoi(".sn button:nth-child("+v+")");
+    };
+    g.appendChild(b);
+  });
+  c.appendChild(g);
+  const tem=typeof active.comentario==="string"&&active.comentario.trim()!=="";
+  const aberto=comentAberto===true||(comentAberto===null&&tem);
+  if(!aberto){
+    /* Recolhido com texto: o botão diz que há texto guardado — presença não se parece com ausência. */
+    const b=el("button","btn-ghost sc-bt",tem?"Abrir comentário · "+plural(active.comentario.length,"caractere","caracteres"):"＋ Escrever comentário");
+    b.onclick=()=>{comentAberto=true;repintarComoFoi("#comentTxt");};
+    c.appendChild(b);
+    if(rascunhoOk===false){const s=el("div","sc-rod");const st=el("div");st.id="comentStatus";s.appendChild(st);c.appendChild(s);pintarRascunho();}
+    return c;
+  }
+  const lb=el("label","fld","Comentário");lb.htmlFor="comentTxt";c.appendChild(lb);
+  const ta=el("textarea","txt-sessao");ta.id="comentTxt";ta.maxLength=COMENT_MAX;ta.rows=3;
+  ta.setAttribute("autocapitalize","sentences");
+  ta.value=tem?active.comentario:"";
+  ta.oninput=()=>{
+    if(!active)return;
+    comentarioNoActive(ta.value);autoAltura(ta);pintarContador(ta);
+    clearTimeout(comentTimer);comentTimer=setTimeout(gravarRascunho,500);
+  };
+  ta.onblur=()=>{if(active)gravarRascunho();};
+  ta.onfocus=()=>keepFieldVisible(ta);
+  c.appendChild(ta);
+  const rod=el("div","sc-rod");
+  const st=el("div");st.id="comentStatus";rod.appendChild(st);
+  const ct=el("div","muted ct");ct.id="comentCont";ct.setAttribute("aria-live","polite");rod.appendChild(ct);
+  c.appendChild(rod);
+  const rc=el("button","btn-ghost sc-bt","Recolher comentário");
+  rc.onclick=()=>{comentAberto=false;gravarRascunho();repintarComoFoi(".sc-bt");};
+  c.appendChild(rc);
+  /* status e contador só existem no DOM depois do append do card: pinta no próximo tique */
+  setTimeout(()=>{if(st.isConnected){pintarRascunho();pintarContador(ta);autoAltura(ta);}},0);
+  return c;
+}
+/* O iOS pode matar a aba sem blur: o que estiver esperando os 0,5 s vai agora. */
+document.addEventListener("visibilitychange",()=>{if(document.hidden&&comentTimer)gravarRascunho();});
+window.addEventListener("pagehide",()=>{if(comentTimer)gravarRascunho();});
 
 /* ---------- v1.18.0 — Treino em andamento (P8.2) ----------
    Cabeçalho fixo (letra · nome · tempo total · 🎵 ? ⋯ · progresso), UM exercício aberto (o foco,
@@ -1378,6 +1497,8 @@ function renderLog(a){
   const addBtn=el("button","btn-ghost","+ Adicionar exercício");addBtn.style.width="100%";addBtn.style.marginBottom="12px";
   addBtn.onclick=()=>{addExOpen=true;render();};
   a.appendChild(addExOpen?addExPanel():addBtn);
+
+  a.appendChild(comoFoiCard());   // v1.21.0: no fim, entre + Adicionar e ✓ Finalizar — nunca no foco nem no descanso
 
   const fin=el("button","btn-primary","✓ Finalizar treino");fin.style.width="100%";fin.style.minHeight="52px";fin.onclick=finishSession;
   a.appendChild(fin);
@@ -1734,6 +1855,7 @@ function lastLogFor(name,day){
 
 let pendingSave=null;   // {sess, v, res} — alimenta a tela de confirmação
 function finishSession(){
+  if(comentTimer)gravarRascunho();   // v1.21.0: o que esperava os 0,5 s vai agora — se a gravação abaixo falhar, o rascunho está guardado
   // descarta séries em branco e exercícios que ficaram sem nenhuma série válida
   const exs=active.exercises
     .map(({done,open,id,...e})=>({...e,sets:(e.sets||[]).filter(st=>String(st.r==null?"":st.r).trim()!=="")
@@ -1742,6 +1864,10 @@ function finishSession(){
   const {ultimoExercicioId,ultimoSetAt,nextEid,restTimer,focoId,...limpo}=active;   // v1.18.0: focoId também não vai pro histórico
   const sess={...limpo,exercises:exs,finished:Date.now()};
   sess.exercises.forEach(e=>e.sets.forEach(st=>{if(!st.t)st.t=sess.finished;}));
+  /* v1.21.0 — o comentário vai sem espaço nas pontas; vazio depois do trim = campo ausente, nunca "".
+     A sensação vai como está (só o card a escreve, e só 1|2|3). `active` não é tocado: se a gravação
+     falhar, o texto continua lá como foi digitado. */
+  if(typeof sess.comentario==="string"){const tc=sess.comentario.trim();if(tc)sess.comentario=tc;else delete sess.comentario;}
 
   const v=validateSession(sess);
   if(v.erros.length){                              // não salva calado
@@ -1767,6 +1893,31 @@ function finishSession(){
   active=null;try{localStorage.removeItem(K.active);}catch(e){}
   pendingSave={sess:sess,v:v,res:{ok:true,total:relido.length},rel:relido[relido.length-1]};   // v1.19.0: a nota da confirmação vem daqui
   go("save");
+}
+
+/* v1.21.0 — "Como foi o treino" na confirmação. Salvo: lê da RELEITURA (fonte = P.rel), como a nota
+   de gosto; não salvo: do que seria salvo (sess). Releitura diferente do que ia ser gravado → âmbar
+   "não relido", mostrando o que o armazenamento tem. Ausência é escrita ("sem sensação", "sem
+   comentário"). Valor fora da regra é mostrado em âmbar, nunca reescrito. Sem controle de edição:
+   o pipeline compara só peso × reps e perderia um texto mudado depois do 1º backup. */
+function comoFoiSalvo(fonte,sess,ok){
+  const b=el("div","salvo-como");
+  const difere=(k)=>ok&&(!fonte||JSON.stringify(fonte[k])!==JSON.stringify(sess[k]));
+  const sv=fonte?fonte.sensacao:undefined;
+  let nt;
+  if(difere("sensacao"))nt="<span class='nt' style='color:var(--warn-tx)'>sensação não relida</span>";
+  else if(sv===undefined)nt="<span class='nt muted' style='font-weight:400'>sem sensação</span>";
+  else if(sensacaoValida(sv))nt="<span class='nt'>"+SENSACAO[sv].c+"</span>";
+  else nt="<span class='nt' style='color:var(--warn-tx)'>sensação inválida: "+esc(String(sv))+"</span>";
+  b.appendChild(el("div","cab","<span class='nm'>Como foi o treino</span>"+nt));
+  const cv=fonte?fonte.comentario:undefined;
+  if(difere("comentario"))b.appendChild(el("div",null,"<span style='color:var(--warn-tx);font-weight:600;font-size:13px'>comentário não relido</span>"));
+  if(cv===undefined){if(!difere("comentario"))b.appendChild(el("div","muted","sem comentário")).style.marginTop="4px";}
+  else if(typeof cv==="string"&&cv.trim()){const t=el("div","txt");t.textContent=cv;b.appendChild(t);}   // inteiro, pre-wrap: nada cortado
+  else b.appendChild(el("div",null,"<span style='color:var(--warn-tx);font-size:13px'>comentário inválido: "+esc(JSON.stringify(cv))+"</span>"));
+  b.appendChild(el("div","muted",ok?"relido do armazenamento · não dá para mudar depois de salvo"
+                                    :"não salvo · continua no treino em andamento")).style.cssText="margin-top:6px;font-size:12px";
+  return b;
 }
 
 /* ---------- CONFIRMAÇÃO DE SALVAMENTO ---------- */
@@ -1852,6 +2003,7 @@ function renderSave(a){
     rod.style.cssText="padding-top:8px;border-top:1px solid var(--border);font-weight:600;font-size:12.5px";
     c.appendChild(rod);
   }
+  c.appendChild(comoFoiSalvo(fonte,sess,ok));
   a.appendChild(c);
 
   const bar=el("div","row wrap");
@@ -2113,6 +2265,10 @@ function sessionMarkdown(s){
     md+="| "+(i+1)+" | [["+e.n+"]]"+(e.mvw?" 🔑":"")+" | "+sets+" | "+restCol+" | "+note+" |\n";
   });
   md+="\n**Volume total:** "+Math.round(sessVol(s))+" kg·rep\n";
+  /* v1.21.0 — só quando há (é export, não tela de prova). Comentário como citação, linha a linha. */
+  if(sensacaoValida(s.sensacao))md+="**Como foi:** "+SENSACAO[s.sensacao].t+"\n";
+  if(typeof s.comentario==="string"&&s.comentario.trim())
+    md+="\n"+s.comentario.split("\n").map(l=>l?"> "+l:">").join("\n")+"\n\n";
   const dm=durMin(s);
   if(dm)md+="**Duração:** "+dm+" min ("+fmtClock(s.started)+"–"+fmtClock(s.finished)+")\n";
   if(restTotal)md+="**Descanso total:** "+Math.round(restTotal/60)+" min ("+restTotal+"s registrados)\n";
@@ -3102,6 +3258,8 @@ function analysisExport(){
       day:s.day,
       dayName:(templates[s.day]&&templates[s.day].name)||null,
       ...(s.avulso===true?{avulso:true}:{}),   // v1.17.0: só quando há; nunca grava false
+      ...(sensacaoValida(s.sensacao)?{sensacao:s.sensacao}:{}),   // v1.21.0: só quando há
+      ...(typeof s.comentario==="string"&&s.comentario.trim()?{comentario:s.comentario}:{}),
       date:s.date,
       startedAt:isoTs(s.started),
       finishedAt:isoTs(s.finished),
@@ -3287,13 +3445,19 @@ function doImport(){
    continua em showMarkdown(), como cópia pra área de transferência. */
 
 /* ============ VERSÃO ============ */
-const APP_VERSION="1.20.0";
+const APP_VERSION="1.21.0";
 const APP_RELEASED="2026-10-05";
 /* Versionamento semântico MAJOR.MINOR.PATCH
    MAJOR = muda o formato dos dados (backup/restore incompatível)
    MINOR = funcionalidade nova, dados compatíveis
    PATCH = correção sem mudar comportamento                        */
 const APP_CHANGELOG=[
+ {v:"1.21.0",d:"2026-10-05",c:[
+   "Fim da tela de treino, entre '+ Adicionar exercício' e '✓ Finalizar treino': card 'Como foi o treino?' com Ruim · Normal · Bom (um toque; tocar de novo apaga) e '＋ Escrever comentário' (até 500 caracteres, contador a partir de 400)",
+   "É opcional: Finalizar continua a um toque, sem pergunta nem lembrete. Não aparece no exercício em foco nem mexe no descanso",
+   "O rascunho fica guardado neste aparelho enquanto você digita e volta se o app fechar. A linha sob o campo diz se guardou; se não guardou, fica âmbar e aponta o Diagnóstico",
+   "Confirmação: mostra a sensação e o comentário relidos do armazenamento, ou 'sem sensação' / 'sem comentário'. Não dá para mudar depois de salvo",
+   "📋 Markdown e export para análise (gymlog) levam os dois quando há. Backup continua {templates, sessions, cfg}: os campos são opcionais e as versões anteriores os guardam sem ler"]},
  {v:"1.20.0",d:"2026-10-05",c:[
    "O treino recomendado olha só o ciclo atual: no começo de um ciclo, a letra ainda não treinada nele vem primeiro, em ordem alfabética (o C5 começa pelo A). O cartão diz 'primeiro do C5' e de quando é o último treino daquela letra ('há 6 dias (no C4) · ainda não treinado no C5')",
    "Treino marcado como condicional no arquivo do ciclo (o F do C5) só vira o recomendado depois que A–D foram feitos na semana. Até lá ele fica nos outros treinos, por último, com 'depois de A–D' e a idade sem laranja. Conta na meta normalmente",
@@ -3361,7 +3525,7 @@ const APP_CHANGELOG=[
    "Exercícios feitos e séries saem de uma função só (progresso), a mesma da barra da aba de treino: as duas telas não podem discordar",
    "A barra da aba de treino passa a contar exercício marcado como feito com série, não 'exercício com alguma linha' — o número pode descer",
    "Histórico ilegível tira a recomendação: sem histórico, apontar 'o mais parado' seria inventar",
-   "Recentes mostra 3 treinos e leva ao Histórico; o botão MD saiu da Home e continua no detalhe da sessão",
+   "Recentes mostra 3 treinos e leva ao Histórico; o botão MD saiu da Home e continua na confirmação ao finalizar",
    "Ao voltar ao app num dia novo, a Home se refaz: segunda de manhã a semana começa vazia",
    "Novo campo opcional na sessão salva: inicio = heroi | outro, só quando havia recomendação na tela. Backup continua compatível"]},
  {v:"1.14.2",d:"2026-09-04",c:[
