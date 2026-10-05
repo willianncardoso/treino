@@ -187,6 +187,7 @@ body.wide .histchart{position:sticky;top:18px}
 .hm-dia.avulso{background:transparent;border:2px dashed var(--muted);color:var(--text)}
 .hm-tile.avulso{grid-column:1/-1;display:flex;align-items:center;gap:12px;border-style:dashed}
 .hm-tile.avulso .big{color:var(--muted);flex:0 0 auto}
+.hm-tile.avulso.meia{grid-column:span 2;align-self:start}   /* v1.20.0 — E ao lado da letra que sobrou */
 .hm-tile.avulso .chev,.opc-row .chev{margin-left:auto;color:var(--muted);font-size:20px;flex:0 0 auto}
 .opc-card{border-style:dashed}
 .opc-row{cursor:pointer;min-height:44px;gap:10px}
@@ -837,6 +838,31 @@ const DIASEM=["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
 const MESX=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
 function dataExtenso(){const d=new Date();return DIASEM[d.getDay()]+", "+d.getDate()+" de "+MESX[d.getMonth()];}
 function diasDe(d){const l=lastSessionFor(d);return l?daysSince(l.date):null;}
+/* v1.20.0 — P10.2: o herói e a régua olham só o CICLO ATUAL. No 1º dia do C5 as letras A–D
+   tinham a idade do C4 e o F (nunca treinado) virava herói; e o 1º A do C5 abria na ordem do
+   último A do C4. A idade EXIBIDA continua a do histórico inteiro (é fato); a ORDEM usa a do
+   ciclo. Ciclo comparado sem espaço nas pontas (cfg.ciclo é texto livre em Ajustes). Sem
+   cfg.ciclo, não há recorte: todo o histórico conta, como antes. */
+function cicloKey(c){return String(c==null?"":c).trim();}
+function doCiclo(s,c){const k=cicloKey(c===undefined?cfg.ciclo:c);return !k||cicloKey(s.ciclo)===k;}
+function lastSessionCiclo(d){const f=sessions.filter(s=>s.day===d&&doCiclo(s));return f.length?f[f.length-1]:null;}
+function diasNoCiclo(d){const l=lastSessionCiclo(d);return l?daysSince(l.date):null;}
+/* Letra condicional (`condicional:true` no template, o F do C5): regra do plano, "o Treino 5 só
+   existe se os Treinos 1 a 4 já foram feitos na semana". Só entra na disputa do herói quando
+   TODAS as letras de rotação não condicionais têm sessão registrada (não avulsa) na semana
+   corrente. A sessão em andamento não conta, como no semanaCard. Conta na meta normalmente. */
+function letrasRotacao(){return Object.keys(templates).filter(d=>!isAvulsoTpl(d)).sort();}
+function isCondicionalTpl(d){return !!(templates[d]&&templates[d].condicional===true);}
+function letrasBase(){return letrasRotacao().filter(d=>!isCondicionalTpl(d));}
+function faixaLetras(ls){   // ["A","B","C","D"] → "A–D"; fora de sequência, "A, C"
+  const seq=ls.length>2&&ls.every((l,i)=>l.length===1&&(!i||l.charCodeAt(0)===ls[i-1].charCodeAt(0)+1));
+  return seq?ls[0]+"–"+ls[ls.length-1]:ls.join(", ");}
+function condicionalBloqueada(d){
+  if(!isCondicionalTpl(d))return false;
+  const [ini,fim]=weekRange();
+  const feitas=new Set(sessions.filter(s=>s.date>=ini&&s.date<=fim&&s.avulso!==true).map(s=>String(s.day)));
+  return letrasBase().some(L=>!feitas.has(L));
+}
 function idadeTxt(n){return n===null?"nunca treinado":n===0?"hoje":n===1?"ontem":"há "+n+" dias";}
 /* P4.10 — a ordem A,B,C,D era o calendário do plano, que não existe mais: não há
    getDay() em lugar nenhum do arquivo. Ordenada por dias sem treinar, a posição passa a
@@ -847,14 +873,17 @@ function idadeTxt(n){return n===null?"nunca treinado":n===0?"hoje":n===1?"ontem"
 function ordemTreinos(falhou){
   const letras=Object.keys(templates).filter(d=>!isAvulsoTpl(d));   // v1.17.0: avulso nunca é herói
   if(falhou)return letras.slice().sort();
-  return letras.slice().sort((x,y)=>{
-    const a1=diasDe(x),b1=diasDe(y);
+  const ord=letras.slice().sort((x,y)=>{
+    const a1=diasNoCiclo(x),b1=diasNoCiclo(y);   // v1.20.0: idade no ciclo atual
     if(a1===null&&b1===null)return x<y?-1:1;
-    if(a1===null)return -1;               // nunca treinado vai pro topo…
+    if(a1===null)return -1;               // sem treino no ciclo vai pro topo…
     if(b1===null)return 1;
     if(a1!==b1)return b1-a1;              // …e o resto, mais dias sem treinar primeiro
     return x<y?-1:1;                      // empate de data: desempata pela letra
   });
+  /* v1.20.0 — letra condicional bloqueada vai pro fim: nunca é herói e fica depois das letras
+     que ela espera, como no Figma (tile F depois do D). Desbloqueada, disputa pela idade. */
+  return ord.filter(d=>!condicionalBloqueada(d)).concat(ord.filter(condicionalBloqueada));
 }
 let homeDia=null;   // dia do último render da Home — a virada de semana/dia re-renderiza
 function renderHome(a){
@@ -913,7 +942,11 @@ function renderHome(a){
       a.appendChild(el("div","muted",modo==="ocioso"?"Outros treinos":"Escolher treino")).style.margin="4px 0 8px";
       const g=el("div","daygrid hm-tiles");
       tiles.forEach(d=>g.appendChild(tileTreino(d,falhou,modo==="ocioso"?"outro":null)));
-      avulsos.forEach(d=>g.appendChild(tileAvulso(d,falhou)));
+      /* v1.20.0 — com 4 tiles (C5: 5 letras − herói) sobra uma letra sozinha na última linha:
+         o E (um só) ocupa as 2 colunas ao lado dela em vez de deixar um buraco. Com 3 ou 6
+         tiles (ou 2/5, onde sobraria 1 coluna), linha inteira, como antes. */
+      const meia=avulsos.length===1&&tiles.length%3===1;
+      avulsos.forEach(d=>g.appendChild(tileAvulso(d,falhou,meia)));
       a.appendChild(g);
     }
   }
@@ -945,14 +978,21 @@ function heroiOcioso(d){
   const t=templates[d]||{name:d,ex:[]};
   const exs=orderLikeLast(d,semOpc(t.ex));          // a ordem em que a sessão VAI abrir, nunca t.ex cru (v1.17.0: sem os opcionais)
   const n=diasDe(d),ult=lastSessionFor(d);
-  const motivo=n===null?"nunca treinado":"mais parado · "+idadeTxt(n);
-  const alerta=n!==null&&n>DIAS_ALERTA;
+  /* v1.20.0 — letra sem treino no ciclo atual: o motivo é "primeiro do C5" e a idade vem com o
+     ciclo de onde ela é ("há 6 dias (no C4) · ainda não treinado no C5", Figma "Home no C5").
+     Sem âmbar: a idade de outro plano não é atraso neste. */
+  const ciclo=cicloKey(cfg.ciclo),nc=diasNoCiclo(d);
+  const primeiro=!!ciclo&&nc===null;
+  const motivo=primeiro?"primeiro do "+ciclo:nc===null?"nunca treinado":"mais parado · "+idadeTxt(nc);
+  const alerta=!primeiro&&nc!==null&&nc>diasAlerta();
+  const deOnde=primeiro?(n===null?"nunca treinado":idadeTxt(n)+(ult&&cicloKey(ult.ciclo)?" (no "+cicloKey(ult.ciclo)+")":""))+" · ainda não treinado no "+ciclo:"";
   const c=el("div","card");c.style.borderColor="var(--accent)";
   c.innerHTML="<div class='row' style='gap:8px'><span class='hm-selo'>PRÓXIMO</span>"+
       "<span style='font-size:13px;font-weight:600;color:"+(alerta?"var(--warn-tx)":"var(--muted)")+"'>"+esc(motivo)+"</span></div>"+
     "<div class='row' style='margin:12px 0 10px;align-items:center'><div class='hm-letra'>"+esc(d)+"</div>"+
       "<div style='min-width:0'><div style='font-weight:650;font-size:19px'>"+esc(t.name)+"</div>"+
-      "<div class='muted'>"+exs.length+(exs.length===1?" exercício":" exercícios")+(ult?" · último em "+esc(ddmm(ult.date)):"")+"</div></div></div>"+
+      (primeiro?"<div class='muted hm-deonde'>"+esc(deOnde)+"</div>":"")+
+      "<div class='muted'>"+exs.length+(exs.length===1?" exercício":" exercícios")+(ult&&!primeiro?" · último em "+esc(ddmm(ult.date)):"")+"</div></div></div>"+
     exs.slice(0,3).map(e=>"<div class='hm-ex'><span class='nm'>"+esc(trimNome(e.n))+"</span><span class='muted'>"+esc(e.sr||"")+"</span></div>").join("")+
     (exs.length>3?"<div class='muted' style='margin-top:2px'>+ "+(exs.length-3)+(exs.length-3===1?" exercício":" exercícios")+"</div>":"");
   const b=el("button","btn-primary hm-cta","Começar treino "+esc(d));
@@ -963,26 +1003,35 @@ function heroiOcioso(d){
 function tileTreino(d,falhou,origem){
   const t=templates[d];const card=el("button","daycard hm-tile");
   let sel;
+  /* v1.20.0 — letra condicional ainda bloqueada na semana: diz o que ela espera ("depois de
+     A–D") e a idade nunca fica âmbar — ela parada é a regra do plano, não atraso. */
+  const bloq=!falhou&&condicionalBloqueada(d);
+  const espera=bloq?"depois de "+faixaLetras(letrasBase()):"";
   if(falhou)sel="histórico não lido";
   else{
     const n=diasDe(d);const txt=idadeTxt(n);
     /* "nunca treinado" é textual e SEM cor de aviso: ausência não se disfarça de "há muitos
-       dias". 10 dias = 4 letras ÷ 3 sessões/semana, um ciclo pulado daquela letra. */
-    sel=(n!==null&&n>DIAS_ALERTA)?"<b style='color:var(--warn-tx)'>"+txt+"</b>":txt;
+       dias". O limite vem de diasAlerta() (um ciclo pulado daquela letra). */
+    sel=(!bloq&&n!==null&&n>diasAlerta())?"<b style='color:var(--warn-tx)'>"+txt+"</b>":txt;
   }
-  card.innerHTML="<div class='big'>"+esc(d)+"</div><div style='font-weight:600;font-size:14px;margin:2px 0;line-height:1.25'>"+esc(t.name)+"</div>"+
+  card.innerHTML="<div class='big'>"+esc(d)+"</div><div style='font-weight:600;font-size:14px;margin:2px 0;line-height:1.25'>"+esc(t.name)+(bloq?" · "+esc(espera):"")+"</div>"+
     "<div class='muted'>"+sel+"</div>";
-  card.setAttribute("aria-label","Começar treino "+d+", "+t.name+", "+card.lastChild.textContent);
+  card.setAttribute("aria-label","Começar treino "+d+", "+t.name+(bloq?", só "+espera+" na semana":"")+", "+card.lastChild.textContent);
   card.onclick=()=>startSession(d,origem);
   return card;
 }
-/* v1.17.0 — tile do treino avulso. A idade NUNCA fica âmbar: o DIAS_ALERTA mede "pulou um
+/* v1.17.0 — tile do treino avulso. A idade NUNCA fica âmbar: o diasAlerta() mede "pulou um
    ciclo da letra", e avulso não tem ciclo. Sem `origem`: ele nunca concorre com o herói, então
    gravar `inicio` mediria nada. */
-function tileAvulso(d,falhou){
-  const t=templates[d];const card=el("button","daycard hm-tile avulso");
+function tileAvulso(d,falhou,meia){
+  const t=templates[d];const card=el("button","daycard hm-tile avulso"+(meia?" meia":""));
   const idade=falhou?"histórico não lido":idadeTxt(diasDe(d));
-  card.innerHTML="<div class='big'>"+esc(d)+"</div><div style='min-width:0'>"+
+  /* v1.20.0 — em 2 colunas (Figma "Home no C5"): a letra entra no título ("E · Abdômen &
+     Cardio"), sem a letra grande nem a seta, que não cabem em ~220 px sem quebrar o nome. */
+  if(meia)card.innerHTML="<div style='min-width:0'>"+
+    "<div style='font-weight:600;font-size:15px;line-height:1.25'>"+esc(d)+" · "+esc(t.name)+"</div>"+
+    "<div class='muted'>avulso · fora da meta · "+esc(idade)+"</div></div>";
+  else card.innerHTML="<div class='big'>"+esc(d)+"</div><div style='min-width:0'>"+
     "<div style='font-weight:600;font-size:15px;line-height:1.25'>"+esc(t.name)+"</div>"+
     "<div class='muted'>avulso · fora da meta · "+esc(idade)+"</div></div><span class='chev' aria-hidden='true'>›</span>";
   card.setAttribute("aria-label","Começar treino "+d+" avulso, "+t.name+", não conta na meta da semana, "+idade);
@@ -1029,8 +1078,12 @@ function lastSessionFor(d){const f=sessions.filter(s=>s.day===d);return f.length
 /* ---------- HOME: as duas perguntas (P4.1 e P4.10) ---------- */
 /* 10 dias não é número inventado: 4 letras ÷ 3 sessões/semana (a meta que a R6 baixou) dá
    um ciclo de 9,3 dias. Passar disso significa ter pulado um ciclo inteiro daquela letra.
-   Colore o número, não um selo de "atrasado" — é fato, não punição. */
-const DIAS_ALERTA=10;
+   Colore o número, não um selo de "atrasado" — é fato, não punição.
+   v1.20.0 — a constante virou a própria conta, para não envelhecer na próxima troca de meta
+   ou de plano: ceil(7 × letras de rotação não condicionais ÷ meta). A–D com meta 3 → 10 (o de
+   antes, e o do C5: o F condicional não entra); 5 letras com meta 5 → 7. Sem letra, 1 (não há
+   tile para colorir). */
+function diasAlerta(){return Math.max(1,Math.ceil(7*letrasBase().length/weekGoal()));}
 const WEEK_GOAL_DEFAULT=3;
 /* Sai do cfg, não do código: o 216 min/mês do cardio virou meta fóssil porque estava
    hardcoded, e a R6 já baixou esta de 4 pra 3. Campo em Ajustes resolve sem release. */
@@ -1125,7 +1178,7 @@ function refMin(d){const t=templates[d];return t?Math.max(2,Math.ceil(semOpc(t.e
 function nExComSerie(s){return (s.exercises||[]).filter(e=>(e.sets||[]).length).length;}
 function refSessionFor(d){
   const min=refMin(d); if(min===null) return null;
-  const f=sessions.filter(s=>s.day===d);
+  const f=sessions.filter(s=>s.day===d&&doCiclo(s));   // v1.20.0: só o ciclo atual — o 1º A do C5 abre na ordem do template
   for(let i=f.length-1;i>=0;i--){
     if(nExComSerie(f[i])>=min) return f[i];
   }
@@ -1832,10 +1885,13 @@ function refAnterior(sess){
   const n=nExComSerie(sess);
   if(n<min)return {motivo:"treino parcial ("+n+" de "+M+" exercícios) — sem comparação"};
   const i=sessions.indexOf(sess);
-  const ant=(i<0?sessions:sessions.slice(0,i)).filter(s=>s.day===d);
-  if(!ant.length)return {motivo:"primeiro treino "+d+" registrado neste app: nada para comparar"};
+  /* v1.20.0 — só sessões do MESMO ciclo da salva (a dela, que é o cfg.ciclo de quando
+     começou): comparar o 1º A do C5 com um A do C4 é comparar planos diferentes. */
+  const ci=cicloKey(sess.ciclo!==undefined?sess.ciclo:cfg.ciclo);
+  const ant=(i<0?sessions:sessions.slice(0,i)).filter(s=>s.day===d&&doCiclo(s,ci));
+  if(!ant.length)return {motivo:ci?"primeiro "+d+" do "+ci+" — sem comparação":"primeiro treino "+d+" registrado neste app: nada para comparar"};
   for(let k=ant.length-1;k>=0;k--)if(nExComSerie(ant[k])>=min)return {ref:ant[k]};
-  return {motivo:"sem treino "+d+" completo anterior para comparar"};
+  return {motivo:"sem treino "+d+" completo anterior"+(ci?" no "+ci:"")+" para comparar"};
 }
 /* Texto da comparação: seta não, cor de juízo também não — mais volume ou menos tempo não é
    "bom" por definição (spec P8.1, decisão 11). */
@@ -2476,11 +2532,16 @@ function renderAnalise(a){
    já tem. Por isso nenhum nome de grupo muscular entra na tela, nem pelo templates[].name.
    E é MÉDIA POR SESSÃO, não soma do mês: julho teve 13 sessões e agosto 9, e a soma faria
    julho parecer um mês diferente quando foi só o mês em que ele mais treinou. */
-const LETRAS=["A","B","C","D"];
+/* v1.20.0 — as letras saem dos templates (sem o avulso), não de uma lista fixa: com
+   ["A","B","C","D"] o F do C5 sumia dos dois gráficos e das faltas, sem aviso. Inclui a
+   condicional (o F é treino de rotação). Templates ilegíveis/vazios → nenhuma linha, e o
+   card diz que não há treino cadastrado em vez de desenhar um gráfico vazio calado. */
 function cardVolLetra(sess){
+  const LETRAS=letrasRotacao();
   const c=el("div","card");c.style.margin="0";c.classList.add("full");
   let h="<h3 style='margin:0 0 2px'>Volume por letra (média por sessão)</h3>";
   if(!sess.length){c.innerHTML=h+"<div class='empty' style='padding:24px 12px'><div class='ic'>📊</div><div>Sem sessões carregadas.</div></div>";return c;}
+  if(!LETRAS.length){c.innerHTML=h+"<div class='empty' style='padding:24px 12px'><div class='ic'>📊</div><div>Nenhum treino de rotação cadastrado · ver Ajustes → Editar treinos</div></div>";return c;}
   const meses=[...new Set(sess.map(s=>s.date.slice(0,7)))].sort();
   const conta={};sess.forEach(s=>{const k=s.day+"|"+s.date.slice(0,7);(conta[k]=conta[k]||[]).push(s.vol);});
   /* Lacuna NÃO é zero: em agosto o D teve zero sessões, e não treinar é diferente de treinar
@@ -2817,7 +2878,10 @@ function buildCharts(sess,H){
      violeta entra só como cor de série. */
   {const meses=[...new Set(sess.map(s=>s.date.slice(0,7)))].sort();
    const conta={};sess.forEach(s=>{const k=s.day+"|"+s.date.slice(0,7);(conta[k]=conta[k]||[]).push(s.vol);});
-   const COR={A:GREEN,B:BLUE,C:WARN,D:"#a78bfa"};
+   /* v1.20.0 — letras derivadas; cor pela posição, e A–D mantêm as de antes. A 5ª (o F do C5)
+      é rosa, ainda longe do RED de alarme; acima de 6 letras a paleta repete. */
+   const LETRAS=letrasRotacao(),PAL=[GREEN,BLUE,WARN,"#a78bfa","#f472b6","#2dd4bf"];
+   const COR={};LETRAS.forEach((L,i)=>COR[L]=PAL[i%PAL.length]);
    const ds=LETRAS.map(L=>({label:"Treino "+L,
      data:meses.map(m=>{const a=conta[L+"|"+m];return a?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null;}),
      borderColor:COR[L],backgroundColor:COR[L],tension:.25,borderWidth:2,pointRadius:3,spanGaps:false}));
@@ -2922,7 +2986,7 @@ function renderCfg(a){
      na v1.3.1 em vez de religado. O backup é o "⬇ Exportar dados" acima, na sua mão. */
   c3.appendChild(el("div","muted","<hr><b>⚠️ Importante:</b> os dados ficam só neste navegador. O iOS pode apagar o armazenamento do Safari após dias sem uso ou ao limpar histórico. Para não perder nada: toque em <b>⬇ Backup pro vault</b> depois de treinar e salve o <code>.json</code> no <b>iCloud Drive</b> (a raiz serve).<br>"+sessions.length+" treinos salvos · último backup: <b id='cfgLastBk'>"+(cfg.lastBackup||"nunca")+"</b>"));
   const rst=el("button","btn-danger btn-sm","Resetar treinos p/ padrão");rst.style.marginTop="8px";
-  rst.onclick=()=>{if(confirm("Restaurar os treinos padrão (A, B, C, D e o E avulso)? Edições nos opcionais também voltam ao padrão. (histórico é preservado)")){templates=JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));save(K.tpl,templates);toast("Restaurado");render();}};
+  rst.onclick=()=>{if(confirm("Restaurar os treinos padrão do código (Ciclo 3: A, B, C, D) e o E avulso? Os treinos do ciclo atual se perdem. (histórico é preservado)")){templates=JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));save(K.tpl,templates);toast("Restaurado");render();}};
   c3.appendChild(rst);
   a.appendChild(c3);
 
@@ -3223,13 +3287,22 @@ function doImport(){
    continua em showMarkdown(), como cópia pra área de transferência. */
 
 /* ============ VERSÃO ============ */
-const APP_VERSION="1.19.0";
+const APP_VERSION="1.20.0";
 const APP_RELEASED="2026-10-05";
 /* Versionamento semântico MAJOR.MINOR.PATCH
    MAJOR = muda o formato dos dados (backup/restore incompatível)
    MINOR = funcionalidade nova, dados compatíveis
    PATCH = correção sem mudar comportamento                        */
 const APP_CHANGELOG=[
+ {v:"1.20.0",d:"2026-10-05",c:[
+   "O treino recomendado olha só o ciclo atual: no começo de um ciclo, a letra ainda não treinada nele vem primeiro, em ordem alfabética (o C5 começa pelo A). O cartão diz 'primeiro do C5' e de quando é o último treino daquela letra ('há 6 dias (no C4) · ainda não treinado no C5')",
+   "Treino marcado como condicional no arquivo do ciclo (o F do C5) só vira o recomendado depois que A–D foram feitos na semana. Até lá ele fica nos outros treinos, por último, com 'depois de A–D' e a idade sem laranja. Conta na meta normalmente",
+   "A ordem dos exercícios ao abrir e a comparação da confirmação também olham só o ciclo atual: o 1º A do C5 abre na ordem do treino cadastrado e a confirmação diz 'primeiro A do C5 — sem comparação'",
+   "O limite do número laranja deixou de ser fixo em 10 dias e virou a conta 7 × letras ÷ meta da semana (treino condicional fora). Com A–D e meta 3 continua 10",
+   "Com cinco letras, o E ocupa as duas colunas ao lado da letra que sobra em vez de deixar um buraco",
+   "Análise: 'Volume por letra' e as faltas dos últimos meses usam as letras cadastradas (o F aparece), não mais A–D fixo",
+   "'Resetar treinos p/ padrão' agora avisa que o padrão do código é o do Ciclo 3 e que os treinos do ciclo atual se perdem",
+   "Sem mudança de dados: backup continua {templates, sessions, cfg}; o campo condicional do template já vinha no arquivo do C5 e as versões anteriores o guardam sem ler"]},
  {v:"1.19.0",d:"2026-10-05",c:[
    "Nota de gosto por exercício: Não gosto · Ok · Gosto. Aparece no card do exercício durante o descanso entre exercícios (depois da última série) e quando você reabre um exercício feito",
    "É opcional e não mexe no descanso: o cronômetro, a barra azul e o 'Próximo exercício' continuam iguais. Tocar de novo na nota escolhida apaga",
