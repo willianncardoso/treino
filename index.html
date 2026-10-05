@@ -182,6 +182,17 @@ body.wide .histchart{position:sticky;top:18px}
 .hm-dia.hoje:not(.cheio){color:var(--text)}
 .hm-dia.anda{background:transparent;border:2px solid var(--accent2);box-shadow:none;color:var(--text)}
 .hm-dia.duas{font-size:11px;letter-spacing:-.3px}
+/* v1.17.0 — Treino E avulso (P9). Tracejado em --muted = "registrado, mas fora da conta":
+   não é o cheio (fundo --accent), nem o anda (contorno sólido --accent2), nem o vazio.
+   --muted sobre --surface dá 5,9:1 no escuro e 5,4:1 no claro (≥ 3:1 de não-texto). */
+.hm-dia.avulso{background:transparent;border:2px dashed var(--muted);color:var(--text)}
+.hm-tile.avulso{grid-column:1/-1;display:flex;align-items:center;gap:12px;border-style:dashed}
+.hm-tile.avulso .big{color:var(--muted);flex:0 0 auto}
+.hm-tile.avulso .chev,.opc-row .chev{margin-left:auto;color:var(--muted);font-size:20px;flex:0 0 auto}
+.opc-card{border-style:dashed}
+.opc-row{cursor:pointer;min-height:44px;gap:10px}
+.opc-row:focus-visible{outline:2px solid var(--accent2);outline-offset:2px;border-radius:6px}
+.tg-on{border-color:var(--accent-tx);color:var(--accent-tx);background:rgba(34,197,94,.12)}
 </style>
 </head>
 <body>
@@ -275,7 +286,7 @@ function validateSession(s){
   const erros=[],avisos=[];
   if(!s||typeof s!=="object")return{erros:["sessão inexistente"],avisos:avisos,stats:{}};
   if(!/^\d{4}-\d{2}-\d{2}$/.test(s.date||""))erros.push("data ausente ou fora do formato AAAA-MM-DD");
-  if(!s.day)erros.push("dia do treino (A/B/C/D) ausente");
+  if(!s.day)erros.push("letra do treino ausente");
   if(!Array.isArray(s.exercises)||!s.exercises.length)erros.push("nenhum exercício com série preenchida");
   let sets=0,comReps=0,comCarga=0,vol=0;
   (s.exercises||[]).forEach((e,i)=>{
@@ -345,7 +356,31 @@ const DEFAULT_TEMPLATES = {
     {n:"Rosca direta com barra W", sr:"3×10-12", rest:60, mvw:false, notes:"38kg"},
     {n:"Adbomen - Cadeira Inclinada", sr:"3×15", rest:45, mvw:false, notes:"Disco 5kg no peito"},
   ]},
+  /* v1.17.0 — P9. Avulso: fora da ordem do herói e fora da meta da semana (quem conta é
+     `avulso:true` gravado na SESSÃO, não este template). `opc` = não nasce na sessão; aparece
+     no card "Opcionais" da tela de treino. Alvos sem carga: o 3×12 do Abdomen - máquina é o
+     que o histórico já faz, o item da cadeira é cópia do D, e opcional nasce sem alvo. */
+  E:{name:"Abdômen & Cardio", avulso:true, ex:[
+    {n:"Abdomen - máquina", sr:"3×12", rest:60, mvw:false, notes:""},
+    {n:"Adbomen - Cadeira Inclinada", sr:"3×15", rest:45, mvw:false, notes:"Disco 5kg no peito"},
+    {n:"Abdômen voador", sr:"", rest:60, mvw:false, notes:"", opc:true},
+    {n:"Extensão Costas Máquina", sr:"", rest:60, mvw:false, notes:"", opc:true},
+    {n:"Prancha (segundos)", sr:"", rest:60, mvw:false, notes:"segundos no campo reps", opc:true},
+  ]},
 };
+/* Letras avulsas que o código conhece. Template gravado no aparelho nunca lê o default, e o
+   import substitui `templates` inteiro: sem isto o E não chegaria a nenhum iPhone. Só
+   acrescenta o que FALTA — um E que já existe (editado ou vindo de backup) vence sempre. */
+function garantirAvulso(){
+  if(!templates||typeof templates!=="object")return [];
+  const postos=[];
+  Object.keys(DEFAULT_TEMPLATES).forEach(k=>{
+    if(!DEFAULT_TEMPLATES[k].avulso||templates[k])return;
+    templates[k]=JSON.parse(JSON.stringify(DEFAULT_TEMPLATES[k]));postos.push(k);});
+  return postos;
+}
+function isAvulsoTpl(d){return !!(templates[d]&&templates[d].avulso);}
+function semOpc(exs){return (exs||[]).filter(e=>!e.opc);}
 
 /* Cada exercício da sessão ativa ganha um id estável. O "exercício ativo" passa a
    ser o do último set logado (ultimoExercicioId) — não a posição na lista. */
@@ -402,6 +437,9 @@ function aparaNomes(lista,campo){
 aparaNomes(Object.values(templates),"ex");        // a fonte: template sujo suja toda sessão nova
 aparaNomes(sessions,"exercises");                  // o legado já gravado
 aparaNomes(active?[active]:[],"exercises");        // sessão em andamento nascida de template sujo
+/* v1.17.0 — só em memória, como o apara acima: o disco recebe o E no próximo save(K.tpl)
+   normal, e o backup exporta a memória. Boot seguinte sem save recoloca (é idempotente). */
+garantirAvulso();
 const GOALS_DEFAULT={weight:[81,83], fat:[15,17], lean:66}; // metas de recomposição
 function goals(){return cfg.goals||GOALS_DEFAULT;}
 function applyTheme(){document.body.classList.toggle("light",cfg.theme==="light");}
@@ -711,7 +749,7 @@ function idadeTxt(n){return n===null?"nunca treinado":n===0?"hoje":n===1?"ontem"
    um treino terminar — nunca embaixo do polegar no meio de uma série.
    Sem histórico legível, a ordem é a da letra: não há base pra recomendar nada. */
 function ordemTreinos(falhou){
-  const letras=Object.keys(templates);
+  const letras=Object.keys(templates).filter(d=>!isAvulsoTpl(d));   // v1.17.0: avulso nunca é herói
   if(falhou)return letras.slice().sort();
   return letras.slice().sort((x,y)=>{
     const a1=diasDe(x),b1=diasDe(y);
@@ -772,10 +810,14 @@ function renderHome(a){
     const tiles=modo==="ocioso"?ordem.slice(1):ordem;
     if(falhou)a.appendChild(el("div","muted","histórico não pôde ser lido — ordem do template · ver Ajustes → Diagnóstico de dados"));
     if(!ordem.length)a.appendChild(el("div","empty","<div>Nenhum treino cadastrado · ver Ajustes → Editar treinos</div>"));
-    if(tiles.length){
+    /* v1.17.0 — o avulso vem sempre por último e na linha inteira: com 3 colunas e 3 letras
+       no ocioso, ele nunca fica órfão no meio de uma linha. */
+    const avulsos=Object.keys(templates).filter(isAvulsoTpl).sort();
+    if(tiles.length||avulsos.length){
       a.appendChild(el("div","muted",modo==="ocioso"?"Outros treinos":"Escolher treino")).style.margin="4px 0 8px";
       const g=el("div","daygrid hm-tiles");
       tiles.forEach(d=>g.appendChild(tileTreino(d,falhou,modo==="ocioso"?"outro":null)));
+      avulsos.forEach(d=>g.appendChild(tileAvulso(d,falhou)));
       a.appendChild(g);
     }
   }
@@ -805,7 +847,7 @@ function renderHome(a){
 }
 function heroiOcioso(d){
   const t=templates[d]||{name:d,ex:[]};
-  const exs=orderLikeLast(d,t.ex||[]);              // a ordem em que a sessão VAI abrir, nunca t.ex cru
+  const exs=orderLikeLast(d,semOpc(t.ex));          // a ordem em que a sessão VAI abrir, nunca t.ex cru (v1.17.0: sem os opcionais)
   const n=diasDe(d),ult=lastSessionFor(d);
   const motivo=n===null?"nunca treinado":"mais parado · "+idadeTxt(n);
   const alerta=n!==null&&n>DIAS_ALERTA;
@@ -836,6 +878,19 @@ function tileTreino(d,falhou,origem){
     "<div class='muted'>"+sel+"</div>";
   card.setAttribute("aria-label","Começar treino "+d+", "+t.name+", "+card.lastChild.textContent);
   card.onclick=()=>startSession(d,origem);
+  return card;
+}
+/* v1.17.0 — tile do treino avulso. A idade NUNCA fica âmbar: o DIAS_ALERTA mede "pulou um
+   ciclo da letra", e avulso não tem ciclo. Sem `origem`: ele nunca concorre com o herói, então
+   gravar `inicio` mediria nada. */
+function tileAvulso(d,falhou){
+  const t=templates[d];const card=el("button","daycard hm-tile avulso");
+  const idade=falhou?"histórico não lido":idadeTxt(diasDe(d));
+  card.innerHTML="<div class='big'>"+esc(d)+"</div><div style='min-width:0'>"+
+    "<div style='font-weight:600;font-size:15px;line-height:1.25'>"+esc(t.name)+"</div>"+
+    "<div class='muted'>avulso · fora da meta · "+esc(idade)+"</div></div><span class='chev' aria-hidden='true'>›</span>";
+  card.setAttribute("aria-label","Começar treino "+d+" avulso, "+t.name+", não conta na meta da semana, "+idade);
+  card.onclick=()=>startSession(d);
   return card;
 }
 function heroiEmTreino(){
@@ -915,24 +970,35 @@ function semanaCard(){
   }
   const [ini,fim]=weekRange(),hoje=today(),meta=weekGoal();
   const sem=sessions.filter(s=>s.date>=ini&&s.date<=fim);
-  const n=sem.length;
-  const porDia={};sem.forEach(s=>{(porDia[s.date]=porDia[s.date]||[]).push(String(s.day));});
+  /* v1.17.0 — avulso fora da meta. A regra lê `avulso` na SESSÃO, não no template: o dado se
+     descreve sozinho, e editar ou perder o template não reclassifica o histórico. */
+  const n=sem.filter(s=>s.avulso!==true).length;
+  const porDia={},avDia={};
+  sem.forEach(s=>{const m=s.avulso===true?avDia:porDia;(m[s.date]=m[s.date]||[]).push(String(s.day));});
+  const avLetras=[...new Set(sem.filter(s=>s.avulso===true).map(s=>String(s.day)))];
   const anda=!!(active&&!isOrfa()&&active.date===hoje);
   const p=ini.split("-"),seg=new Date(+p[0],+p[1]-1,+p[2]);
   let dias="";
   for(let i=0;i<7;i++){
     const x=new Date(seg);x.setDate(seg.getDate()+i);
     const ds=x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0");
-    const L=porDia[ds]||[],eHoje=ds===hoje;
+    const L=porDia[ds]||[],AV=avDia[ds]||[],eHoje=ds===hoje;
     let cls="hm-dia",txt="",lbl=SEMNOME[i]+(eHoje?", hoje":"");
-    if(L.length){cls+=" cheio"+(L.length>1?" duas":"");txt=L.join("");lbl+=", treino "+L.join(" e ")+" registrado";}
-    else if(eHoje&&anda){cls+=" anda";txt=String(active.day);lbl+=", treino "+active.day+" em andamento, ainda não registrado";}
+    /* Dia com letra E avulso: a célula mostra só a letra (duas letras de pesos diferentes numa
+       bolinha de 36 px não se leem); o avulso fica no aria-label. */
+    const avLbl=AV.length?", treino "+AV.join(" e ")+" avulso registrado, não conta na meta":"";
+    if(L.length){cls+=" cheio"+(L.length>1?" duas":"");txt=L.join("");lbl+=", treino "+L.join(" e ")+" registrado"+avLbl;}
+    else if(AV.length){cls+=" avulso"+(AV.length>1?" duas":"");txt=AV.join("");lbl+=avLbl;}
+    else if(eHoje&&anda){cls+=" anda";txt=String(active.day);lbl+=", treino "+active.day+(active.avulso===true?" avulso":"")+" em andamento, ainda não registrado";}
     else{txt=eHoje?String(x.getDate()):"";lbl+=", nada registrado";}
     if(eHoje)cls+=" hoje";
     dias+="<div><div class='lb' aria-hidden='true'>"+SEMLB[i]+"</div><div class='"+cls+"' role='img' aria-label='"+esc(lbl)+"'>"+esc(txt)+"</div></div>";
   }
-  const pe=anda?"ao terminar, "+(n+1)+" de "+meta+" · a contagem só muda quando o treino for salvo"
+  const andaAv=anda&&active.avulso===true;
+  let pe=andaAv?"treino avulso em andamento · não muda a meta"
+        :anda?"ao terminar, "+(n+1)+" de "+meta+" · a contagem só muda quando o treino for salvo"
           :(n>=meta?"Meta batida":"Falta "+(meta-n)+" para a meta")+" · conta os treinos registrados neste app";
+  if(avLetras.length&&!andaAv)pe+=" · "+avLetras.join(" e ")+" não conta";
   c.innerHTML="<div class='row'><h2 style='margin:0;flex:1'>Esta semana</h2>"+
       "<span style='font-weight:700;font-size:17px;color:var(--accent-tx)'>"+n+" de "+meta+"</span></div>"+
     "<div class='hm-semana'>"+dias+"</div>"+
@@ -957,7 +1023,9 @@ function execOrderOf(sess){
 // bagunce a ordem de todos os próximos.
 /* v1.16.0 — a régua saiu pra função própria porque a confirmação (P8.1) usa a MESMA, sobre
    outro recorte de sessões: duas cópias do 60 % seriam duas réguas no primeiro ajuste. */
-function refMin(d){const t=templates[d];return t?Math.max(2,Math.ceil((t.ex||[]).length*0.6)):null;}
+/* v1.17.0 — conta só os exercícios sem `opc`: com 2 fixos e 3 opcionais, exigir 3 para ser
+   "representativo" faria a comparação quase nunca aparecer. Nas letras sem opc dá o de antes. */
+function refMin(d){const t=templates[d];return t?Math.max(2,Math.ceil(semOpc(t.ex).length*0.6)):null;}
 function nExComSerie(s){return (s.exercises||[]).filter(e=>(e.sets||[]).length).length;}
 function refSessionFor(d){
   const min=refMin(d); if(min===null) return null;
@@ -989,12 +1057,51 @@ function startSession(d,origem){
   if(active && !confirm("Já existe um treino em andamento. Descartar e começar "+d+"?"))return;
   const t=templates[d];
   active={day:d,date:today(),ciclo:cfg.ciclo,plano:cfg.plano,started:Date.now(),
-    exercises:orderLikeLast(d,t.ex).map(e=>({n:trimNome(e.n),sr:e.sr,rest:e.rest,mvw:e.mvw,notes:e.notes,sets:[]}))};  // v1.14.1: template sujo não suja a sessão
-  if(origem==="heroi"||origem==="outro")active.inicio=origem;
+    exercises:orderLikeLast(d,semOpc(t.ex)).map(exDoTemplate)};  // v1.14.1: template sujo não suja a sessão · v1.17.0: opcional não nasce na sessão
+  /* v1.17.0 — `avulso` vai pra sessão e é ele que as contas de frequência leem. Avulso não
+     grava `inicio`: nunca concorre com o herói. */
+  if(t.avulso)active.avulso=true;
+  else if(origem==="heroi"||origem==="outro")active.inicio=origem;
   ensureIds(active);
   save(K.active,active);go("log");
 }
 function persistActive(){save(K.active,active);}
+function exDoTemplate(e){return {n:trimNome(e.n),sr:e.sr,rest:e.rest,mvw:e.mvw,notes:e.notes,sets:[]};}
+/* v1.17.0 — card "Opcionais": os `opc` do template que ainda NÃO estão na sessão (por
+   trimNome), na ordem do template. Derivado a cada render: se o exercício sair da sessão, ele
+   volta sozinho; com todos incluídos, ou template sem opcionais, o card não existe. */
+function opcionaisPendentes(act){
+  const t=act&&templates[act.day];if(!t)return [];
+  const na=new Set((act.exercises||[]).map(e=>trimNome(e.n)));
+  return (t.ex||[]).filter(e=>e.opc&&!na.has(trimNome(e.n)));
+}
+function incluirOpcional(e){
+  active.exercises.push(exDoTemplate(e));   // alvo, descanso, MVW e notas do template — não o 3×10 · 60s do "+ Adicionar"
+  ensureIds(active);persistActive();render();
+}
+function ultimaVezTxt(nome){
+  if(readFailed(K.sess))return "histórico não lido";   // cicatriz nº 1: ausência não vira "primeira vez"
+  const H=exerciseHistory(trimNome(nome));
+  return H.length?"última "+fmtSetsSalvo(H[0].sets)+" ("+ddmm(H[0].date)+")":"primeira vez";
+}
+function opcionaisCard(){
+  const pend=opcionaisPendentes(active);
+  if(!pend.length)return null;
+  const c=el("div","card opc-card");
+  c.appendChild(el("h3",null,"Opcionais")).style.margin="0 0 2px";
+  c.appendChild(el("div","muted","toque para incluir · não conta no progresso até entrar"));
+  pend.forEach(e=>{
+    const r=el("div","sess opc-row");
+    r.setAttribute("role","button");r.tabIndex=0;
+    r.setAttribute("aria-label","Incluir "+trimNome(e.n)+" no treino");
+    r.innerHTML="<div style='min-width:0'><div style='font-weight:650'>"+esc(trimNome(e.n))+"</div>"+
+      "<div class='muted'>"+esc(ultimaVezTxt(e.n))+"</div></div><span class='chev' aria-hidden='true'>›</span>";
+    r.onclick=()=>incluirOpcional(e);
+    r.onkeydown=ev=>{if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();incluirOpcional(e);}};
+    c.appendChild(r);
+  });
+  return c;
+}
 
 function renderLog(a){
   const t=templates[active.day];
@@ -1030,6 +1137,8 @@ function renderLog(a){
        restaurada. Instantâneo sempre acontece, e numa retomada não há nada pra animar. */
     if(card&&order.indexOf(alvo)>0)setTimeout(()=>card.scrollIntoView({block:"center"}),60);
   }
+
+  const opc=opcionaisCard();if(opc)a.appendChild(opc);   // v1.17.0: depois da lista, antes do + Adicionar
 
   const addBtn=el("button","btn-ghost","+ Adicionar exercício");addBtn.style.width="100%";addBtn.style.marginBottom="12px";
   addBtn.onclick=()=>{addExOpen=true;render();};
@@ -1189,7 +1298,7 @@ function exCard(e,ei,isActive){
   head.innerHTML="<div><span class='ex-title'>"+esc(e.n)+"</span>"+(e.mvw?"<span class='tag mvw'>🔑 MVW</span>":"")+
     (e.done?(pulado?"<span class='tag' style='background:rgba(148,163,184,.15);color:var(--muted)'>↷ pulado</span>"
                    :"<span class='tag' style='background:rgba(34,197,94,.15);color:var(--accent-tx)'>✓ feito</span>"):"")+
-    "<div class='muted'>alvo "+esc(e.sr)+" · desc "+e.rest+"s</div></div>";
+    "<div class='muted'>"+(e.sr?"alvo "+esc(e.sr)+" · ":"sem alvo · ")+"desc "+e.rest+"s</div></div>";   // v1.17.0: opcional nasce sem alvo
   const doneBtn=el("button","btn-ghost btn-sm",e.done?"▴":"✓");doneBtn.title=e.done?"Recolher":"Marcar como feito";doneBtn.style.flex="0 0 auto";
   doneBtn.onclick=()=>{e.done=true;e.open=false;persistActive();render();};
   const demo=el("button","btn-ghost btn-sm","🔍");demo.title="Ver exercício";demo.style.flex="0 0 auto";
@@ -1406,7 +1515,7 @@ function fmtSetsSalvo(sets){
    régua de refSessionFor (refMin). Atenção: aqui a sessão já está em `sessions`; ela própria
    e o que vier depois dela ficam de fora. Devolve {ref} ou {motivo}. */
 function refAnterior(sess){
-  const d=sess.day,min=refMin(d),M=templates[d]?(templates[d].ex||[]).length:0;
+  const d=sess.day,min=refMin(d),M=templates[d]?semOpc(templates[d].ex).length:0;
   if(min===null)return {motivo:"sem o modelo do treino "+d+" para medir — sem comparação"};
   const n=nExComSerie(sess);
   if(n<min)return {motivo:"treino parcial ("+n+" de "+M+" exercícios) — sem comparação"};
@@ -1863,7 +1972,7 @@ function ensureChart(cb){if(window.Chart)return cb();
 function normSessions(){return sessions.map(s=>{
     const exs=(s.exercises||[]).map(e=>{const sets=(e.sets||[]).map(st=>({w:parseFloat(st.w)||0,r:parseFloat(st.r)||0}));
       return {name:e.n,sets,top:sets.reduce((a,x)=>Math.max(a,x.w),0),vol:sets.reduce((a,x)=>a+x.w*x.r,0)};});
-    return {day:s.day,date:s.date,exercises:exs,vol:exs.reduce((a,e)=>a+e.vol,0)};
+    return {day:s.day,date:s.date,avulso:s.avulso===true,exercises:exs,vol:exs.reduce((a,e)=>a+e.vol,0)};
   }).filter(s=>s.date).sort((a,b)=>a.date<b.date?-1:1);}
 function moAvg(m){const g={};for(const k in m){(g[k.slice(0,7)]=g[k.slice(0,7)]||[]).push(m[k]);}const o={};for(const y in g)o[y]=g[y].reduce((a,b)=>a+b,0)/g[y].length;return o;}
 function latestVal(m){const ks=Object.keys(m||{}).sort();return ks.length?{d:ks[ks.length-1],v:m[ks[ks.length-1]]}:null;}
@@ -1897,7 +2006,7 @@ function renderAnalise(a){
   // KPIs
   const kp=el("div");kp.style.cssText="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px";
   const kpi=(l,v,s)=>"<div class='card' style='margin:0;padding:13px'><div class='muted' style='font-size:10px;text-transform:uppercase;letter-spacing:.5px'>"+l+"</div><div style='font-size:21px;font-weight:750;margin-top:2px'>"+v+"</div>"+(s?"<div class='muted' style='font-size:12px;margin-top:1px'>"+s+"</div>":"")+"</div>";
-  const last56=sess.filter(s=>(new Date(sess[sess.length-1].date)-new Date(s.date))/864e5<=56).length;
+  const last56=sess.filter(s=>!s.avulso&&(new Date(sess[sess.length-1].date)-new Date(s.date))/864e5<=56).length;   // v1.17.0: frequência sem avulso
   let html=kpi("Sessões",sess.length,"última "+fmtD(sess[sess.length-1].date))
     +kpi("Freq. (8 sem)",(last56/8).toFixed(1)+"/sem","")
     +kpi("Volume total",Math.round(sess.reduce((a,s)=>a+s.vol,0)/1000)+"k","kg·rep");
@@ -1974,11 +2083,16 @@ function renderAnalise(a){
 
   /* ===== 1 · ADERÊNCIA ===== */
   const g1=secao("1 · Aderência","ele foi?");
-  g1.appendChild(chartCard("Volume & frequência mensal","cVolFreq","Volume (barras) e nº de sessões (linha)"));
+  /* v1.17.0 — as duas contagens de frequência deixam o avulso de fora (o volume, não: é série
+     de verdade). Fora da conta não é omitido: o rodapé diz quantos ficaram de fora. */
+  const avs=sess.filter(s=>s.avulso),avL=[...new Set(avs.map(s=>s.day))].sort().join("/");
+  const avNota=c=>{if(avs.length){const n=el("div","muted",avs.length+(avs.length===1?" treino "+esc(avL)+" avulso fora da contagem":" treinos "+esc(avL)+" avulsos fora da contagem"));
+    n.style.marginTop="6px";n.dataset.avulsos=avs.length;c.appendChild(n);}return c;};
+  g1.appendChild(avNota(chartCard("Volume & frequência mensal","cVolFreq","Volume (barras) e nº de sessões (linha)")));
   /* P6.4 — sex 18 · ter 17 · qua 12 · sáb 12 · seg 10 · qui 10 · dom 2. A segunda-feira, onde o
      plano põe a abertura da semana, é um dos dias mais fracos de toda a história. Descritivo:
      sem meta, sem cor de alarme — o P4.10 já age sobre isto na Home. */
-  g1.appendChild(chartCard("Sessões por dia da semana","cDow","todo o histórico · descritivo, sem meta"));
+  g1.appendChild(avNota(chartCard("Sessões por dia da semana","cDow","todo o histórico · descritivo, sem meta")));
 
   /* ===== 2 · EXECUÇÃO ===== */
   const g2=secao("2 · Execução","o que aconteceu no treino?");
@@ -2107,7 +2221,7 @@ function chartAusenteGlobal(title,key){const c=el("div","card");c.style.margin="
   return c;}
 function paresDefasagem(bm){
   const tre={},pes={};
-  sessions.forEach(s=>{if(!s.date)return;const w=segundaDe(s.date);tre[w]=(tre[w]||0)+1;});
+  sessions.forEach(s=>{if(!s.date||s.avulso===true)return;const w=segundaDe(s.date);tre[w]=(tre[w]||0)+1;});   // v1.17.0: treinos/semana sem avulso
   Object.keys(bm||{}).forEach(d=>{const w=segundaDe(d);(pes[w]=pes[w]||[]).push(bm[d]);});
   const med={};for(const w in pes)med[w]=pes[w].reduce((a,b)=>a+b,0)/pes[w].length;
   /* Mesmo corte dos cartões vizinhos (2025-11). Antes disso há duas semanas soltas de 2025 que
@@ -2260,7 +2374,7 @@ function buildCharts(sess,H){
   const mk=(id,cfg)=>{const cv=document.getElementById(id);if(!cv)return;charts.push(new Chart(cv.getContext("2d"),cfg));};
   const line=(d,color,axis,fill)=>({label:d.label,data:d.data,borderColor:color,backgroundColor:fill||color,yAxisID:axis||"y",tension:.25,pointRadius:d.data.length>40?0:2,borderWidth:2,spanGaps:true});
   // treino mensal
-  const vol={},cnt={};sess.forEach(s=>{const y=s.date.slice(0,7);vol[y]=(vol[y]||0)+s.vol;cnt[y]=(cnt[y]||0)+1;});
+  const vol={},cnt={};sess.forEach(s=>{const y=s.date.slice(0,7);vol[y]=(vol[y]||0)+s.vol;if(!s.avulso)cnt[y]=(cnt[y]||0)+1;});   // v1.17.0: a linha Sessões não conta avulso; o volume conta
   const tmonths=Object.keys(vol).sort();
 
   if(H){
@@ -2354,7 +2468,7 @@ function buildCharts(sess,H){
   /* P6.4 — dia da semana em hora LOCAL: new Date("2026-08-31") seria UTC e jogaria treino de
      segunda-feira pro domingo. Mesmo parse manual do daysSince. */
   {const dc=[0,0,0,0,0,0,0];
-   sess.forEach(s=>{const p=String(s.date).split("-");
+   sess.forEach(s=>{if(s.avulso)return;const p=String(s.date).split("-");   // v1.17.0: sem avulso
      const wd=new Date(+p[0],+p[1]-1,+p[2]).getDay();     // 0=dom
      dc[(wd+6)%7]++;});                                    // 0=seg
    mk("cDow",{type:"bar",data:{labels:["seg","ter","qua","qui","sex","sáb","dom"],
@@ -2383,7 +2497,7 @@ function buildCharts(sess,H){
 
   mk("cVolFreq",{data:{labels:tmonths,datasets:[
     {type:"bar",label:"Volume (kg·rep)",data:tmonths.map(m=>vol[m]),backgroundColor:"rgba(34,197,94,.5)",yAxisID:"y"},
-    {type:"line",label:"Sessões",data:tmonths.map(m=>cnt[m]),borderColor:BLUE,backgroundColor:BLUE,yAxisID:"y1",tension:.25,borderWidth:2},
+    {type:"line",label:"Sessões",data:tmonths.map(m=>cnt[m]||0),borderColor:BLUE,backgroundColor:BLUE,yAxisID:"y1",tension:.25,borderWidth:2},
   ]},options:{maintainAspectRatio:false,scales:{y:{position:"left"},y1:{position:"right",grid:{drawOnChartArea:false},min:0}}}});
 
   /* P6.7 — quatro séries categóricas precisam de quatro matizes distinguíveis; a paleta do
@@ -2472,7 +2586,8 @@ function renderCfg(a){
   c2.appendChild(el("div","muted","Toque para abrir e ajustar exercícios, alvos e descanso."));
   Object.keys(templates).forEach(d=>{
     const r=el("div","sess");
-    r.innerHTML="<div class='row'><span class='dot'>"+d+"</span><div style='font-weight:600'>"+esc(templates[d].name)+"</div></div>";
+    r.innerHTML="<div class='row'><span class='dot'>"+esc(d)+"</span><div style='font-weight:600'>"+esc(templates[d].name)+"</div>"+
+      (isAvulsoTpl(d)?"<span class='muted'>avulso</span>":"")+"</div>";
     const b=el("button","btn-ghost btn-sm","Editar");b.onclick=()=>editTemplate(d);
     r.appendChild(b);c2.appendChild(r);
   });
@@ -2495,7 +2610,7 @@ function renderCfg(a){
      na v1.3.1 em vez de religado. O backup é o "⬇ Exportar dados" acima, na sua mão. */
   c3.appendChild(el("div","muted","<hr><b>⚠️ Importante:</b> os dados ficam só neste navegador. O iOS pode apagar o armazenamento do Safari após dias sem uso ou ao limpar histórico. Para não perder nada: toque em <b>⬇ Backup pro vault</b> depois de treinar e salve o <code>.json</code> no <b>iCloud Drive</b> (a raiz serve).<br>"+sessions.length+" treinos salvos · último backup: <b id='cfgLastBk'>"+(cfg.lastBackup||"nunca")+"</b>"));
   const rst=el("button","btn-danger btn-sm","Resetar treinos p/ padrão");rst.style.marginTop="8px";
-  rst.onclick=()=>{if(confirm("Restaurar os 4 treinos padrão? (histórico é preservado)")){templates=JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));save(K.tpl,templates);toast("Restaurado");render();}};
+  rst.onclick=()=>{if(confirm("Restaurar os treinos padrão (A, B, C, D e o E avulso)? Edições nos opcionais também voltam ao padrão. (histórico é preservado)")){templates=JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));save(K.tpl,templates);toast("Restaurado");render();}};
   c3.appendChild(rst);
   a.appendChild(c3);
 
@@ -2610,6 +2725,7 @@ function analysisExport(){
     sessions:sessions.map(s=>({
       day:s.day,
       dayName:(templates[s.day]&&templates[s.day].name)||null,
+      ...(s.avulso===true?{avulso:true}:{}),   // v1.17.0: só quando há; nunca grava false
       date:s.date,
       startedAt:isoTs(s.started),
       finishedAt:isoTs(s.finished),
@@ -2661,11 +2777,22 @@ function editTemplate(d){
     const sr=fldInput("Alvo",e.sr,"text",v=>{e.sr=v;save(K.tpl,templates);});
     const rs=fldInput("Desc(s)",e.rest,"number",v=>{e.rest=parseInt(v)||0;save(K.tpl,templates);});
     const nt=fldInput("Notas",e.notes,"text",v=>{e.notes=v;save(K.tpl,templates);});
-    const mv=el("div");mv.appendChild(el("label","fld","🔑 MVW"));
-    const mb=el("button",e.mvw?"btn-primary btn-sm":"btn-ghost btn-sm",e.mvw?"Sim":"Não");mb.style.width="100%";
-    mb.onclick=()=>{e.mvw=!e.mvw;save(K.tpl,templates);editTemplate(d);};mv.appendChild(mb);
-    g.appendChild(sr);g.appendChild(rs);g.appendChild(nt);g.appendChild(mv);
+    nt.style.gridColumn="span 2";
+    g.appendChild(sr);g.appendChild(rs);g.appendChild(nt);
     c.appendChild(g);
+    /* v1.17.0 — MVW e Opcional como duas alternâncias lado a lado (desenho P9). Opcional vale
+       pra qualquer letra: não nasce na sessão, aparece no card "Opcionais" do treino. O estado
+       é dito pela cor E pelo aria-pressed, não só pela cor. Falha de gravação é dita. */
+    const tg=el("div","row");tg.style.marginTop="8px";
+    [["mvw","🔑 MVW"],["opc","Opcional"]].forEach(([k,lb])=>{
+      const b=el("button","btn-ghost btn-sm"+(e[k]?" tg-on":""),lb);
+      b.setAttribute("aria-pressed",e[k]?"true":"false");
+      b.onclick=()=>{if(e[k])delete e[k];else e[k]=true;
+        if(k==="mvw")e.mvw=!!e.mvw;                     // mvw sempre existiu como booleano; opc só existe quando ligado
+        if(!save(K.tpl,templates))toast("Não foi gravado — ver Diagnóstico");
+        editTemplate(d);};
+      tg.appendChild(b);});
+    c.appendChild(tg);
     const ig=el("div");ig.style.marginTop="8px";ig.appendChild(el("label","fld","Imagem do exercício (URL) — opcional"));
     const ii=el("input");ii.type="url";ii.placeholder="https://...jpg/gif";ii.style.textAlign="left";ii.value=e.img||"";
     ii.oninput=()=>{e.img=ii.value.trim();save(K.tpl,templates);};
@@ -2743,10 +2870,15 @@ function doImport(){
         if(r.ruins)linhas.push("⚠ "+r.ruins+" treino(s) do arquivo estão incompletos");
       }
       if(r.templates!=null)linhas.push("Templates: "+r.templates+" ("+r.exercicios+" exercícios)");
+      /* v1.17.0 — o import substitui `templates`; o que faltar de avulso volta do padrão. Dito
+         aqui porque é gravado junto, não acrescentado calado. */
+      const faltaAv=d.templates?Object.keys(DEFAULT_TEMPLATES).filter(k=>DEFAULT_TEMPLATES[k].avulso&&!d.templates[k]):[];
+      if(faltaAv.length)linhas.push("Treino "+faltaAv.join(", ")+" avulso não está no arquivo — entra o padrão do app");
       linhas.push("","Substituir os dados deste aparelho?");
       if(!confirm(linhas.join("\n")))return;
 
       if(d.templates)templates=d.templates;
+      garantirAvulso();                              // v1.17.0: E do arquivo vence; se faltar, o save abaixo grava o padrão
       if(d.sessions)sessions=d.sessions;
       if(d.cfg)cfg=d.cfg;
       /* v1.14.1 — o import atribui por cima DEPOIS do boot, então o apara da leitura não
@@ -2778,13 +2910,27 @@ function doImport(){
    continua em showMarkdown(), como cópia pra área de transferência. */
 
 /* ============ VERSÃO ============ */
-const APP_VERSION="1.16.0";
-const APP_RELEASED="2026-09-30";
+const APP_VERSION="1.17.0";
+const APP_RELEASED="2026-10-05";
 /* Versionamento semântico MAJOR.MINOR.PATCH
    MAJOR = muda o formato dos dados (backup/restore incompatível)
    MINOR = funcionalidade nova, dados compatíveis
    PATCH = correção sem mudar comportamento                        */
 const APP_CHANGELOG=[
+ {v:"1.17.0",d:"2026-10-05",c:[
+   "Treino E · Abdômen & Cardio, para o dia em que é só cardio e abdômen: fica fora da ordem do treino recomendado e fora da meta da semana",
+   "Na Home, o E é sempre o último tile, na linha inteira, com contorno tracejado: 'avulso · fora da meta · há N dias' — a idade nunca fica laranja",
+   "Na semana, o dia com E aparece em contorno tracejado com a letra; o número 'N de M' não conta o E, e a frase termina em '· E não conta'",
+   "E em andamento hoje: o dia fica em contorno e a frase diz 'treino avulso em andamento · não muda a meta'",
+   "O E abre só com os dois fixos (Abdomen - máquina e Adbomen - Cadeira Inclinada); os opcionais ficam num card 'Opcionais' abaixo da lista, com a última vez de cada um",
+   "Tocar num opcional o põe no fim da lista com o alvo e o descanso do template; ele só conta no progresso depois de entrar",
+   "Editar treinos: cada exercício ganha o botão 'Opcional', ao lado do 🔑 MVW, em qualquer letra. Opcional não nasce na sessão",
+   "Exercício sem alvo mostra 'sem alvo · desc 60s' em vez de 'alvo  ·'",
+   "A régua de 'treino completo' (ordem da sessão e comparação da confirmação) conta só os exercícios que não são opcionais",
+   "O E chega a aparelhos que já tinham treinos gravados e a backups importados sem ele; um E que já existe nunca é sobrescrito",
+   "Análise: a linha Sessões, 'Sessões por dia da semana', a frequência de 8 semanas e o treino × peso não contam avulso, e o rodapé diz quantos ficaram de fora; volume e cargas contam",
+   "'Resetar treinos p/ padrão' agora diz que restaura A, B, C, D e o E",
+   "Novo campo opcional na sessão salva: avulso = true, só no E. Backup continua {templates, sessions, cfg} e compatível com a v1.16.0"]},
  {v:"1.16.0",d:"2026-09-30",c:[
    "Confirmação ao finalizar reorganizada: status, avisos, números, backup e, aberta logo abaixo, a lista do que foi salvo série a série",
    "O status diz quantos treinos a releitura devolveu: '✓ conferido por releitura · N treinos no histórico'",
