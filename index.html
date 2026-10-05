@@ -124,7 +124,6 @@ body.kb .sessionbar{bottom:calc(var(--kb,0px) + 8px)}
   .sessionbar.resting.over .sb-inner{animation:none;box-shadow:0 6px 30px rgba(239,68,68,.85)}
 }
 .ex.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 4px 16px rgba(34,197,94,.12)}
-.ex.active .ex-title::before{content:"▶ ";color:var(--accent-tx);font-size:12px}
 .sess{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--border)}
 .sess:last-child{border-bottom:none}
 .dot{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;background:var(--surface2)}
@@ -193,6 +192,41 @@ body.wide .histchart{position:sticky;top:18px}
 .opc-row{cursor:pointer;min-height:44px;gap:10px}
 .opc-row:focus-visible{outline:2px solid var(--accent2);outline-offset:2px;border-radius:6px}
 .tg-on{border-color:var(--accent-tx);color:var(--accent-tx);background:rgba(34,197,94,.12)}
+/* v1.18.0 — Treino em andamento (P8.2). Cabeçalho fixo dentro do .wrap (fundo opaco, senão a
+   lista passa visível por trás), um exercício em foco, os outros em linha. Nada anima. */
+.tr-head{position:sticky;top:0;z-index:40;background:var(--bg);margin:-18px -16px 12px;padding:12px 16px 10px;border-bottom:1px solid var(--border)}
+.tr-head .tt{min-width:0;flex:1}
+.tr-head h1{margin:0;font-size:19px}
+.tr-head .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tr-clock{text-align:right;flex:0 0 auto}
+.tr-clock .sb-t{font-size:20px}
+.tr-ic{width:44px;height:44px;padding:0;flex:0 0 auto;font-size:17px}
+.tr-ic[aria-expanded="true"]{border-color:var(--accent2)}
+.tr-seg{display:flex;gap:4px;margin:10px 0 8px}
+.tr-seg i{flex:1;height:6px;border-radius:3px;background:var(--surface2)}
+.tr-seg i.ok{background:var(--accent)}
+.tr-seg i.foco{box-shadow:inset 0 0 0 1px var(--accent)}
+.ex-pend{border-left:1px solid var(--border);min-height:56px}
+.ex-pend .u{min-width:0;flex:1}
+.ex-pend .u .nm{display:block}
+.ex-pend .chev{color:var(--muted);font-size:20px;flex:0 0 auto}
+.ex .chips{margin-top:5px}
+.ex .chips .tag{margin:0 6px 0 0;font-size:11px;padding:2px 8px}
+.lastbox .lh{display:flex;align-items:center;gap:8px}
+.lastbox .lh .hl{flex:1;min-width:0}
+.setrow.cab{margin-bottom:4px}
+.setrow.cab .fld{margin:0}
+.setrow .idx b{display:block;color:var(--accent-tx);font-size:13px;line-height:1}
+.setrow input{scroll-margin-top:150px}
+.tr-main{width:100%;min-height:52px;font-size:16px;margin-top:4px}
+.tr-sec{margin-top:6px;gap:4px;flex-wrap:wrap}
+.tr-sec button{background:none;padding:8px 10px;color:var(--muted)}
+.tr-sec button.az,button.az{color:var(--accent2)}
+.tr-main:disabled,.tr-main:disabled:active{background:transparent;border:1px solid var(--border);color:var(--muted);opacity:1;font-weight:500}
+.sb-rest .sb-lbl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-rest>div:first-child{min-width:0;flex:1}
+/* #3b82f6 como TEXTO sobre branco dá 3,7:1; no claro o link azul escurece (6,7:1). */
+body.light .tr-sec button.az,body.light button.az{color:#1d4ed8}
 </style>
 </head>
 <body>
@@ -200,18 +234,13 @@ body.wide .histchart{position:sticky;top:18px}
 
 <div class="sessionbar" id="sessionbar">
   <div class="sb-inner">
-    <div class="sb-idle">
-      <div><div class="sb-lbl">TEMPO TOTAL</div><div class="sb-t" id="sbElapsed">0:00</div></div>
-      <div style="text-align:right"><div class="sb-lbl" id="sbProg">0/0 ex</div><div class="muted" id="sbVol" style="font-size:12px">0 kg·rep</div></div>
-    </div>
+    <!-- v1.18.0 (P8.2): a barra só existe no descanso. O tempo total foi para o cabeçalho fixo
+         do treino, e o volume saiu da tela de treino (continua na confirmação e no Histórico). -->
     <div class="sb-rest">
-      <div><div class="sb-lbl"><span id="sbRestLbl">DESCANSO</span> <span id="sbRestTgt"></span></div><div class="sb-t" id="sbRestT" style="color:#fff">0:00</div></div>
-      <div style="text-align:right">
-        <div class="sb-lbl">TOTAL <span id="sbElapsedR" style="color:#fff;font-weight:700">0:00</span></div>
-        <div class="row" style="margin-top:5px;justify-content:flex-end">
-          <button class="btn-sm" style="background:#fff;color:#0b0f14;font-weight:700" onclick="markLap()">🏁 Próxima</button>
-          <button class="btn-sm" style="background:rgba(255,255,255,.2)" onclick="stopRest()">Parar</button>
-        </div>
+      <div><div class="sb-lbl" id="sbRestLbl">DESCANSO</div><div class="sb-t" id="sbRestT" style="color:#fff">0:00</div><div class="sb-lbl" id="sbRestEx"></div></div>
+      <div class="row" style="justify-content:flex-end;flex:0 0 auto;gap:8px">
+        <button class="btn-sm" id="sbNext" style="background:#0b0f14;color:#fff;font-weight:700" onclick="markLap()">Próxima série</button>
+        <button class="btn-sm" style="background:transparent;border:1px solid rgba(255,255,255,.85);color:#fff" onclick="stopRest()">Parar</button>
       </div>
     </div>
   </div>
@@ -242,7 +271,7 @@ function logIO(kind,key,msg,bytes){
 }
 /* Nem tudo que não é "ok" é falha: export bem-sucedido é "backup" e cancelamento é
    "backup-cancel" — cancelar não é erro e não pode ser contado nem pintado como um. */
-const IO_NAO_FALHA={ok:1,backup:1,"backup-cancel":1};
+const IO_NAO_FALHA={ok:1,backup:1,"backup-cancel":1,discard:1};   // v1.18.0: descartar é escolha dele, não falha
 function ioFail(r){return !IO_NAO_FALHA[r&&r.kind];}
 function ioLogRead(){try{const r=localStorage.getItem(K.iolog);return r?JSON.parse(r):[];}catch(e){return [];}}
 
@@ -457,6 +486,17 @@ function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("on");
 function setVol(sets){return sets.reduce((a,s)=>a+(parseFloat(s.w)||0)*(parseFloat(s.r)||0),0);}
 function targetSets(e){const m=String(e.sr||"").match(/^\s*(\d+)/);return m?+m[1]:0;}
 function completedSets(e){return e.sets.filter(s=>s.r!==""&&s.r!=null).length;}
+/* v1.18.0 (P8.2) — "série feita" é a que tem `t` E já foi fechada: pelo botão principal (marca
+   `f`, que vive só em `active` e sai no finishSession) ou por uma pausa gravada (`rest`, o
+   caminho ▶ Descanso → Próxima série de antes). Por que não só `t`: o touchSet carimba `t` ao
+   digitar as reps, então a linha que ele está preenchendo já teria `t` e ganharia ✓ antes do
+   toque — e o botão "Série N feita" nunca apareceria. A linha ABERTA é a última, se ainda não
+   foi fechada; é nela que o botão principal age. */
+function temReps(st){return String(st&&st.r!=null?st.r:"").trim()!=="";}
+function fechada(st){return !!(st&&(st.f||st.rest!=null));}
+function linhaAberta(e){const s=e.sets||[];const l=s[s.length-1];return (l&&!fechada(l))?s.length-1:-1;}
+function seriesFeitas(e){return (e.sets||[]).filter(st=>st.t&&temReps(st)&&fechada(st)).length;}
+function fmtAlvo(sec){return Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0");}
 const INTER_REST=120; // descanso padrão entre exercícios (2min)
 function topWeight(sets){return sets.reduce((a,s)=>Math.max(a,parseFloat(s.w)||0),0);}
 function fmtClock(ts){if(!ts)return"--:--";const d=new Date(ts);return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");}
@@ -517,8 +557,8 @@ function fmtDur(ms){const t=Math.max(0,Math.floor(ms/1000));const h=Math.floor(t
   return (h?h+":"+String(m).padStart(2,"0"):m)+":"+String(sec).padStart(2,"0");}
 let elapsedId=null;
 function startElapsed(){clearInterval(elapsedId);
-  const tick=()=>{if(!active){clearInterval(elapsedId);return;}const s=fmtDur(Date.now()-active.started);
-    const e=$("#sbElapsed");if(e)e.textContent=s;const e2=$("#sbElapsedR");if(e2)e2.textContent=s;};
+  const tick=()=>{if(!active){clearInterval(elapsedId);return;}
+    const e=$("#trClock");if(e&&active.started)e.textContent=fmtDur(Date.now()-active.started);};   // v1.18.0: o relógio mora no cabeçalho do treino
   tick();elapsedId=setInterval(tick,1000);}
 /* v1.15.0 — progresso de uma sessão em andamento. UMA função só, lida pelo herói da Home e
    pela barra da aba de treino (e, na P8.2, pelo cabeçalho do treino). Antes a barra contava
@@ -535,18 +575,29 @@ function progresso(act){
 /* O exercício "do momento": o do último set logado, se ainda não foi concluído; senão o 1º não
    concluído; -1 se todos estão concluídos. É o alvo do `Continuar treino →` (P4.7) e o `AGORA`
    do herói — a mesma função, pra que a caixa nunca aponte um exercício e o toque leve a outro. */
+/* v1.18.0 — o toque numa linha grava `focoId`, e ele vem primeiro (se não estiver feito). A Home
+   e o "Continuar treino →" seguem a mesma regra que a tela de treino, pra nunca apontarem
+   exercícios diferentes. */
 function exercicioDoMomento(act){
   const exs=(act&&Array.isArray(act.exercises))?act.exercises:[];
-  let i=act&&act.ultimoExercicioId?exs.findIndex(e=>e.id===act.ultimoExercicioId):-1;
+  let i=act&&act.focoId?exs.findIndex(e=>e.id===act.focoId):-1;
+  if(i>=0&&!exs[i].done)return i;
+  i=act&&act.ultimoExercicioId?exs.findIndex(e=>e.id===act.ultimoExercicioId):-1;
   if(i<0||exs[i].done)i=exs.findIndex(e=>!e.done);
   return i;
 }
-function refreshSbIdle(){if(!active)return;const p=$("#sbProg"),v=$("#sbVol");
-  const pr=progresso(active);
-  if(p)p.textContent=pr.x+"/"+pr.m+" ex";
-  if(v)v.textContent=Math.round(sessVol(active))+" kg·rep";}
+/* Foco da tela de treino — spec P8 (c): 1) focoId (feito ou não: se está feito, foi ele que
+   tocou nele; toda conclusão apaga o focoId que apontava pro concluído); 2) ultimoExercicioId
+   não feito; 3) 1º não feito; 4) nenhum (-1). */
+function focoIdx(act){
+  const exs=(act&&Array.isArray(act.exercises))?act.exercises:[];
+  const i=act&&act.focoId?exs.findIndex(e=>e.id===act.focoId):-1;
+  return i>=0?i:exercicioDoMomento(act);
+}
+function concluir(e){e.done=true;delete e.open;if(active&&active.focoId===e.id)delete active.focoId;}
+/* v1.18.0 — a barra só aparece com descanso em curso (startRest a liga, stopRest a desliga). */
 function updateSessionBar(){const sb=$("#sessionbar");if(!sb)return;
-  if(tab==="log"&&active){sb.classList.add("on");refreshSbIdle();startElapsed();resumeRest();}
+  if(tab==="log"&&active){startElapsed();resumeRest();if(!swId)sb.classList.remove("on","resting","over");}
   else{sb.classList.remove("on","resting","over");clearInterval(swId);swId=null;clearInterval(elapsedId);}}
 function openMusic(){if(!cfg.musicUrl){toast("Configure a playlist em Ajustes");go("cfg");return;}
   window.open(cfg.musicUrl,"_blank");}
@@ -565,30 +616,46 @@ function startRest(exIdx,resumeTs){const e=active.exercises[exIdx]||{};swExIdx=e
     if(e.id&&active){active.ultimoExercicioId=e.id;active.ultimoSetAt=Date.now();}
     if(active){active.restTimer={s:swStart,i:exIdx};persistActive();}
   }
-  const inter=targetSets(e)&&completedSets(e)>=targetSets(e);
+  const inter=descansoEntre(e);
   swTarget=inter?INTER_REST:(e.rest||0);
   if(resumeTs&&swTarget&&(Date.now()-swStart)/1000>=swTarget)swBeeped=true;  // a meta passou antes do reload: não bipa retroativo
-  const lb=$("#sbRestLbl");if(lb)lb.textContent=inter?"ENTRE EXERCÍCIOS":"DESCANSO";
-  const tg=$("#sbRestTgt");if(tg)tg.textContent=swTarget?"(meta "+(inter?"2min":swTarget+"s")+")":"";
+  /* v1.18.0 — a barra diz DE QUAL exercício é o descanso: ele pode abrir outro no meio da pausa. */
+  /* O nome vai numa linha própria: numa só, "DESCANSO · Supino reto - banco · alvo 2:30" corta o alvo em 390 px. */
+  const lb=$("#sbRestLbl");if(lb)lb.textContent=(inter?"ENTRE EXERCÍCIOS":"DESCANSO")+(swTarget?" · alvo "+fmtAlvo(swTarget):"");
+  const lx=$("#sbRestEx");if(lx)lx.textContent=e.n||"";
+  const nx=$("#sbNext");if(nx)nx.textContent=inter?"Próximo exercício":"Próxima série";
   const sb=$("#sessionbar");if(sb){sb.classList.add("on","resting");sb.classList.remove("over");}swTick();clearInterval(swId);swId=setInterval(swTick,250);}
+/* Alvo do descanso — spec P8 (c): séries FEITAS contra o alvo, não linhas com reps (linha
+   pré-preenchida não é série feita). A linha aberta conta se já foi tocada (`t` + reps): é o
+   caminho ▶ Descanso, em que a série descansada ainda não foi fechada. */
+function descansoEntre(e){
+  const alvo=targetSets(e);if(!alvo)return false;
+  const ia=linhaAberta(e),la=ia>=0?e.sets[ia]:null;
+  return seriesFeitas(e)+((la&&la.t&&temReps(la))?1:0)>=alvo;
+}
 function swTick(){const sec=Math.floor((Date.now()-swStart)/1000);
   const over=swTarget&&sec>=swTarget;
   const e2=$("#sbRestT");if(e2){const mm=Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0");
     e2.textContent=over?"+"+mm:mm;}
   const sb=$("#sessionbar");if(sb)sb.classList.toggle("over",!!over);
   if(over&&!swBeeped){swBeeped=true;beep();}}
+/* `Próxima série`. v1.18.0: NÃO sobrescreve mais o `t` da série — antes `ls.t=Date.now()`
+   trocava o fim da série pelo fim da pausa. Só carimba se não houver. A pausa continua sendo
+   gravada em `rest` exatamente como antes, pelos dois caminhos (botão principal ou ▶ Descanso). */
 function markLap(){const sec=Math.round((Date.now()-swStart)/1000);
   const e=active.exercises[swExIdx];
   if(e){active.ultimoExercicioId=e.id;active.ultimoSetAt=Date.now();
-    if(e.sets.length){const ls=e.sets[e.sets.length-1];ls.rest=sec;ls.t=Date.now();}
-    if(targetSets(e)&&completedSets(e)>=targetSets(e)){e.done=true;e.open=false;} // alvo atingido → conclui exercício
+    if(e.sets.length){const ls=e.sets[e.sets.length-1];ls.rest=sec;
+      if(temReps(ls)){if(!ls.t)ls.t=Date.now();ls.f=1;}}
+    if(targetSets(e)&&seriesFeitas(e)>=targetSets(e))concluir(e);   // alvo atingido → conclui; o foco vai pro próximo não feito
     else{const last=e.sets[e.sets.length-1]||{};e.sets.push({w:last.w||"",r:last.r||""});}
     persistActive();}
   stopRest();render();
   toast(sec+"s registrado");}
 function stopRest(){clearInterval(swId);swId=null;
   if(active&&active.restTimer){delete active.restTimer;persistActive();}
-  const sb=$("#sessionbar");if(sb)sb.classList.remove("resting","over");}
+  const sb=$("#sessionbar");if(sb)sb.classList.remove("on","resting","over");
+  if(tab==="log"&&active&&$("#app .tr-main"))render();}   // o botão do foco sai de "Descansando…"
 /* Chamado a cada render da aba de treino: reload ou volta de outra aba recuperam a
    pausa em curso pelo carimbo salvo, em vez de perdê-la. */
 function resumeRest(){
@@ -670,10 +737,20 @@ function keepFieldVisible(i){
     const vv=window.visualViewport;
     const sb=$("#sessionbar");
     const reserva=(sb&&sb.classList.contains("on"))?98:12;
-    const topo=(vv?vv.offsetTop:0)+8;
+    const hd=$(".tr-head");   // v1.18.0: o cabeçalho fixo do treino cobre o topo — campo nunca fica sob ele
+    const topo=(vv?vv.offsetTop:0)+8+(hd?hd.getBoundingClientRect().height:0);
     const base=(vv?vv.offsetTop+vv.height:window.innerHeight)-reserva;
     const r=i.getBoundingClientRect();
-    if(r.bottom>base||r.top<topo)i.scrollIntoView({block:"center"});
+    /* v1.18.0 (P8.2, aceite 10): além do campo, o botão principal do foco ("Série N feita")
+       deve ficar à vista com o teclado aberto — rola só o que falta, sem pôr o campo sob o
+       cabeçalho. Se não couberem os dois, vale o campo (e tocar no card fecha o teclado, P5.4). */
+    const bt=i.closest(".ex")&&i.closest(".ex").querySelector(".tr-main");
+    const falta=bt?bt.getBoundingClientRect().bottom-base:0;
+    if(r.top>=topo&&r.bottom<=base&&falta>0&&r.top-falta>=topo)window.scrollBy(0,falta);
+    else if(r.bottom>base||r.top<topo){
+      const alvo=bt&&(bt.getBoundingClientRect().bottom-r.top)<=(base-topo)?bt.getBoundingClientRect().bottom-base:(r.top+r.bottom)/2-(topo+base)/2;
+      window.scrollBy(0,alvo);
+    }
   },320);   // o teclado do iOS leva ~250ms pra terminar de subir
 }
 
@@ -682,11 +759,13 @@ function isDesktop(){return window.matchMedia("(min-width: 900px)").matches;}
 /* P5.12 — sair da tela de confirmação pela tabbar deixava `pendingSave` pendurado até o
    reload. Não corrompe nada (o treino já está gravado e conferido), mas é estado morto:
    quem não vai pra "save" não tem confirmação pendente. */
-function go(t){if(t!=="save")pendingSave=null;tab=t;bkState={phase:"idle"};addExOpen=false;render();window.scrollTo(0,0);}  // relatório de export é do toque, não do dia
+function go(t){if(t!=="save")pendingSave=null;tab=t;bkState={phase:"idle"};addExOpen=false;trPainel=null;render();window.scrollTo(0,0);}  // relatório de export é do toque, não do dia
 /* P4.7: ligado só na retomada de sessão (reload e "Continuar treino →"), consumido pela
    renderLog. Nunca a cada série — a lista não pode se mexer no meio do toque. */
 let wantScrollActive=false;
 let addExOpen=false;    // P4.8: painel de adicionar exercício aberto
+let wantScrollFoco=false;   // v1.18.0: tocou numa linha / incluiu um exercício → leva o foco à vista (só se ficou fora)
+let trPainel=null;          // v1.18.0: card aberto sob o cabeçalho do treino — null | "ajuda" | "mais"
 function renderTabs(){
   const tabs=[["home","🏠","Treinar"],["hist","📈","Histórico"]];
   if(isDesktop())tabs.push(["analise","📊","Análise"]);
@@ -795,7 +874,7 @@ function renderHome(a){
     f.onclick=finishSession;
     const d=el("button","btn-danger","Descartar");d.style.width="100%";d.style.marginTop="8px";
     d.onclick=()=>{if(confirm("Descartar este treino? Os dados não serão salvos."))
-      {active=null;localStorage.removeItem(K.active);go("home");}};
+      {descartarAtiva();go("home");}};   // v1.18.0: grava `discard` no iolog, como o ⋯ do treino
     c.appendChild(f);c.appendChild(d);a.appendChild(c);
   }else if(modo==="treino"){
     a.appendChild(heroiEmTreino());
@@ -1055,6 +1134,7 @@ function orderLikeLast(d,exs){
    um "outro" que contaria contra a regra sem ela ter sido mostrada. */
 function startSession(d,origem){
   if(active && !confirm("Já existe um treino em andamento. Descartar e começar "+d+"?"))return;
+  if(active)descartarAtiva();   // v1.18.0: substituir também é descartar — conta no iolog
   const t=templates[d];
   active={day:d,date:today(),ciclo:cfg.ciclo,plano:cfg.plano,started:Date.now(),
     exercises:orderLikeLast(d,semOpc(t.ex)).map(exDoTemplate)};  // v1.14.1: template sujo não suja a sessão · v1.17.0: opcional não nasce na sessão
@@ -1077,12 +1157,34 @@ function opcionaisPendentes(act){
 }
 function incluirOpcional(e){
   active.exercises.push(exDoTemplate(e));   // alvo, descanso, MVW e notas do template — não o 3×10 · 60s do "+ Adicionar"
-  ensureIds(active);persistActive();render();
+  ensureIds(active);
+  active.focoId=active.exercises[active.exercises.length-1].id;   // v1.18.0: acabou de escolher, vira o foco
+  persistActive();wantScrollFoco=true;render();
 }
 function ultimaVezTxt(nome){
   if(readFailed(K.sess))return "histórico não lido";   // cicatriz nº 1: ausência não vira "primeira vez"
+  return ultimaTxt(nome);                              // v1.18.0: a regra da linha pendente (emenda E › P8.2)
+}
+/* v1.18.0 — "Última" na linha pendente, spec P8 (c). Com carga: a série de maior carga (entre
+   elas, mais reps). Sem carga: reps (iguais → "10 reps"; diferentes → "10·9·9 reps"). A data só
+   aparece quando a última vez NÃO foi a sessão anterior da mesma letra. null = histórico não
+   lido (quem chama decide: a linha pendente omite, o card de opcionais diz que não leu). */
+function melhorSerie(sets){
+  const v=(sets||[]).filter(temReps);if(!v.length)return null;
+  if(v.every(semCarga)){const rs=v.map(st=>String(st.r).trim());
+    return {carga:false,txt:(rs.every(r=>r===rs[0])?rs[0]:rs.join("·"))+" reps",maxR:Math.max.apply(null,rs.map(r=>parseFloat(r)||0))};}
+  let b=null;v.forEach(st=>{if(semCarga(st))return;const w=parseFloat(st.w),r=parseFloat(st.r)||0;
+    if(!b||w>b.w||(w===b.w&&r>b.r))b={w:w,r:r,st:st};});
+  return {carga:true,txt:String(b.st.w).trim()+"kg×"+String(b.st.r).trim()};
+}
+function ultimaTxt(nome){
+  if(readFailed(K.sess))return null;
   const H=exerciseHistory(trimNome(nome));
-  return H.length?"última "+fmtSetsSalvo(H[0].sets)+" ("+ddmm(H[0].date)+")":"primeira vez";
+  if(!H.length)return "primeira vez";
+  const m=melhorSerie(H[0].sets);if(!m)return "primeira vez";
+  const ref=active?lastSessionFor(active.day):null;
+  const daAnterior=!!(ref&&ref.date===H[0].date&&ref.day===H[0].day);
+  return "última "+m.txt+(daAnterior?"":" ("+ddmm(H[0].date)+")");
 }
 function opcionaisCard(){
   const pend=opcionaisPendentes(active);
@@ -1103,24 +1205,87 @@ function opcionaisCard(){
   return c;
 }
 
+/* ---------- v1.18.0 — Treino em andamento (P8.2) ----------
+   Cabeçalho fixo (letra · nome · tempo total · 🎵 ? ⋯ · progresso), UM exercício aberto (o foco,
+   regra em focoIdx), os outros em linha, na ordem estável de active.exercises — os feitos NÃO
+   vão mais pro fim (a lista não se mexe debaixo do polegar; fecha o P4.5). Descartar mora no ⋯. */
+const TR_AJUDA="Preencha kg e reps → <b>Série feita · descansar</b> → <b>Próxima série</b> grava a pausa. 🔍 mostra o exercício.";
+function plural(n,um,varios){return n+" "+(n===1?um:varios);}
+function progTxt(pr){return pr.x+" de "+pr.m+(pr.m===1?" exercício":" exercícios")+" · "+plural(pr.s,"série","séries");}
+function cabecalhoTreino(t,pr,fi){
+  const h=el("div","tr-head");
+  const row=el("div","row");row.style.gap="8px";
+  row.appendChild(el("div","tt","<h1>Treino "+esc(active.day)+"</h1><div class='muted nm'>"+esc(t?t.name:"")+"</div>"));
+  const ck=el("div","tr-clock");
+  /* Sessão órfã: um relógio de 30 h não é tempo de treino. */
+  if(isOrfa())ck.innerHTML="<div style='color:var(--warn-tx);font-weight:650;font-size:13px'>iniciado em "+esc(ddmm(active.date))+"</div>";
+  else if(active.started)ck.innerHTML="<div class='sb-t' id='trClock'>"+fmtDur(Date.now()-active.started)+"</div><div class='muted' style='font-size:11px'>tempo total</div>";
+  row.appendChild(ck);
+  const mus=el("button","btn-ghost tr-ic","🎵");mus.setAttribute("aria-label","Abrir a playlist");mus.onclick=openMusic;
+  const aj=el("button","btn-ghost tr-ic","?");aj.setAttribute("aria-label","Como usar esta tela");
+  aj.setAttribute("aria-expanded",trPainel==="ajuda"?"true":"false");aj.setAttribute("aria-controls","trPainel");
+  aj.onclick=()=>{trPainel=trPainel==="ajuda"?null:"ajuda";render();};
+  const mais=el("button","btn-ghost tr-ic","⋯");mais.setAttribute("aria-label","Mais opções do treino");
+  mais.setAttribute("aria-expanded",trPainel==="mais"?"true":"false");mais.setAttribute("aria-controls","trPainel");
+  mais.onclick=()=>{trPainel=trPainel==="mais"?null:"mais";render();};
+  row.appendChild(mus);row.appendChild(aj);row.appendChild(mais);
+  h.appendChild(row);
+  if(pr.m){
+    const sg=el("div","tr-seg");sg.setAttribute("aria-hidden","true");
+    active.exercises.forEach((e,i)=>{const s=el("i");
+      if(e.done&&completedSets({sets:e.sets||[]})>=1)s.className="ok";
+      else if(i===fi)s.className="foco";
+      sg.appendChild(s);});
+    h.appendChild(sg);
+  }
+  /* Treino avulso (E): diz que está fora da meta aqui também, não só na Home. */
+  if(active.avulso===true)h.appendChild(el("div","muted","avulso · não conta na meta da semana")).style.marginTop=pr.m?"0":"6px";
+  const p=el("div","muted",esc(progTxt(pr)));p.id="trProg";if(!pr.m)p.style.marginTop="6px";
+  h.appendChild(p);
+  return h;
+}
+function refreshTrProg(){const p=$("#trProg");if(p&&active)p.textContent=progTxt(progresso(active));}
+/* Descartar: três toques (⋯ → Descartar treino → confirm) é o preço certo. Grava `discard` no
+   iolog ANTES de apagar — é a única forma de contar "treino concluído" contra abandonado. */
+function descartarAtiva(){
+  if(!active)return;
+  logIO("discard",K.active,active.day+" · "+plural(progresso(active).s,"série","séries"));
+  clearInterval(swId);swId=null;
+  active=null;
+  try{localStorage.removeItem(K.active);}
+  catch(e){logIO("save-fail",K.active,"descartar: "+e.message);toast("não consegui apagar do armazenamento — ver Diagnóstico");}
+}
+function painelTreino(){
+  const c=el("div","card");c.id="trPainel";
+  if(trPainel==="ajuda"){c.appendChild(el("div","muted",TR_AJUDA)).style.fontSize="14px";return c;}
+  const r=el("div","grid2");
+  const d=el("button","btn-danger","Descartar treino");
+  d.onclick=()=>{if(confirm("Descartar este treino? Os dados não serão salvos.")){descartarAtiva();go("home");}};
+  const x=el("button","btn-ghost","Cancelar");x.onclick=()=>{trPainel=null;render();};
+  r.appendChild(d);r.appendChild(x);c.appendChild(r);
+  return c;
+}
 function renderLog(a){
   const t=templates[active.day];
-  const head=el("div","row");
-  head.innerHTML="<div style='flex:1'><h1>Treino "+active.day+"</h1><div class='muted'>"+esc(t.name)+" · "+active.date+"</div></div>";
-  const music=el("button","btn-ghost btn-sm","🎵");music.title="Música";music.onclick=openMusic;
-  head.appendChild(music);
-  a.appendChild(head);
+  const fi=focoIdx(active);
+  /* Foco recém-aberto sem série: o app cria UMA linha vazia (persistida; o finishSession já
+     descarta linha sem reps). Valor nunca — a última vez vai como placeholder. */
+  if(fi>=0){const fe=active.exercises[fi];if(!fe.done&&!(fe.sets||[]).length){fe.sets.push({w:"",r:""});persistActive();}}
+  a.appendChild(cabecalhoTreino(t,progresso(active),fi));
+  if(trPainel)a.appendChild(painelTreino());
+  /* Instrução aberta só na instalação nova. Com a leitura do histórico falhando, `sessions` vem
+     vazio — isso NÃO é instalação nova, e a instrução fica só atrás do ?. */
+  else if(!sessions.length&&!readFailed(K.sess)){const i=el("div","muted",TR_AJUDA);i.style.marginBottom="12px";a.appendChild(i);}
 
-  a.appendChild(el("div","muted","Preencha a série → <b>▶ Descanso</b> conta a pausa → <b>🏁 Próxima</b> grava a pausa e cria a próxima. 🔍 mostra o exercício. O tempo total fica sempre na barra de baixo."));
-
-  // feitos vão pro fim da lista (ordem estável)
-  const order=active.exercises.map((e,i)=>i).sort((x,y)=>(active.exercises[x].done?1:0)-(active.exercises[y].done?1:0));
-  // ativo = exercício do último set logado; antes de logar qualquer coisa, o 1º não concluído
-  let activeIdx=active.ultimoExercicioId
-    ? active.exercises.findIndex(e=>e.id===active.ultimoExercicioId) : -1;
-  if(activeIdx<0)activeIdx=active.exercises.findIndex(e=>!e.done);
+  const order=active.exercises.map((e,i)=>i);   // ordem estável: a de orderLikeLast, sem mandar os feitos pro fim
   const nodes={};
-  order.forEach(i=>{const n=exCard(active.exercises[i],i,i===activeIdx);nodes[i]=n;a.appendChild(n);});
+  order.forEach(i=>{const e=active.exercises[i];const n=i===fi?exCard(e,i,true):exLinha(e,i);nodes[i]=n;a.appendChild(n);});
+  if(wantScrollFoco){
+    wantScrollFoco=false;const card=nodes[fi];
+    if(card)setTimeout(()=>{const r=card.getBoundingClientRect(),hd=$(".tr-head");
+      const topo=hd?hd.getBoundingClientRect().bottom:0;
+      if(r.top<topo||r.top>window.innerHeight*0.55)card.scrollIntoView({block:"start"});},40);
+  }
 
   /* P4.7 — a lista NÃO reordena durante o treino: mexer debaixo do polegar troca meio
      scroll por um toque no exercício errado. Medido no navegador: o render() a cada série
@@ -1130,7 +1295,7 @@ function renderLog(a){
      exercício do momento. Isto é rolagem, não uma quarta regra de ordenação. */
   if(wantScrollActive){
     wantScrollActive=false;
-    let alvo=exercicioDoMomento(active);   // v1.15.0: a mesma regra do AGORA da Home
+    let alvo=fi;   // v1.18.0: o foco — a mesma regra do AGORA da Home quando ele não tocou em nada
     const card=nodes[alvo];
     /* Sem `behavior:"smooth"` de propósito: medido no navegador, o scroll suave é
        descartado quando o documento está `hidden` — que é exatamente o caso de uma aba
@@ -1144,13 +1309,9 @@ function renderLog(a){
   addBtn.onclick=()=>{addExOpen=true;render();};
   a.appendChild(addExOpen?addExPanel():addBtn);
 
-  const fin=el("button","btn-primary","✓ Finalizar treino");fin.style.width="100%";fin.onclick=finishSession;
+  const fin=el("button","btn-primary","✓ Finalizar treino");fin.style.width="100%";fin.style.minHeight="52px";fin.onclick=finishSession;
   a.appendChild(fin);
-  const disc=el("button","btn-danger","Descartar");disc.style.width="100%";disc.style.marginTop="8px";
-  disc.onclick=()=>{if(confirm("Descartar este treino? Os dados não serão salvos."))
-    {active=null;localStorage.removeItem(K.active);go("home");}};
-  a.appendChild(disc);
-  a.appendChild(el("div",null,"<div style='height:110px'></div>"));
+  a.appendChild(el("div",null,"<div style='height:110px'></div>"));   // Descartar saiu daqui: mora no ⋯ (v1.18.0)
 }
 
 /* ============ ADICIONAR EXERCÍCIO (P4.8) ============ */
@@ -1194,7 +1355,9 @@ function addExercicio(nome){
   if(!n)return;
   const canonico=exNameOptions().lista.find(x=>normNome(x)===normNome(n))||n;
   active.exercises.push({n:canonico,sr:"3×10",rest:60,mvw:false,notes:"",sets:[]});
-  ensureIds(active);addExOpen=false;persistActive();render();
+  ensureIds(active);addExOpen=false;
+  active.focoId=active.exercises[active.exercises.length-1].id;   // v1.18.0: exercício adicionado vira o foco
+  persistActive();wantScrollFoco=true;render();
   if(canonico!==n)toast('Usei "'+canonico+'" — já está no histórico');
 }
 
@@ -1268,23 +1431,93 @@ function trendChip(H){if(H.length<2)return"";const d=Math.round((H[0].top-H[1].t
   if(d<0)return"<span class='trend dn'>↓ "+d+"kg</span>";
   return"<span class='trend eq'>= manteve</span>";}
 
-function exCard(e,ei,isActive){
-  /* P1.7 — "feito" só é verdade se sobrou série. O mesmo filtro do finishSession
-     (série sem reps é descartada, exercício sem série não entra no histórico), então
-     um exercício marcado sem nenhuma série vira `↷ pulado` nas duas telas. Pulado não
-     é feito, e a interface era o único lugar que dizia o contrário. */
-  const doneSets=e.sets.filter(s=>s.r!==""&&s.r!=null);
-  const pulado=!doneSets.length;
-  // estado concluído e recolhido
-  if(e.done&&!e.open){
-    const d=el("div","exdone");
+/* v1.18.0 — resumo de séries que respeita exercício sem carga: "3× 10 reps", nunca "?kg×10" nem
+   "0kg×10". Só a tela de treino usa; o summarizeSets do Histórico não foi tocado. */
+function resumoTr(sets){if(!sets.length)return"";const p=[];let i=0;
+  const lb=st=>semCarga(st)?(String(st.r||"?").trim()+" reps"):(String(st.w).trim()+"kg×"+String(st.r||"?").trim());
+  while(i<sets.length){const k=lb(sets[i]);let c=1;while(i+c<sets.length&&lb(sets[i+c])===k)c++;
+    p.push((c>1?c+"× ":"")+k);i+=c;}
+  return p.join(" · ");}
+/* Tendência só entre sessões COM carga: sem carga não há chip (o "= manteve" de 0 contra 0 saiu). */
+function trendTr(H){if(!H.length||!(H[0].top>0))return"";return trendChip(H.filter(h=>h.top>0));}
+
+/* Linha de exercício fora do foco. Feito: `✓ nome · N séries · 50kg×12` (maior carga e as reps
+   dela); pulado: `↷ nome · pulado`. Pendente: nome, alvo e "última …" (ou "2 de 4 séries"), ›.
+   Toque em qualquer uma grava focoId e ela vira o foco. */
+function exLinha(e,ei){
+  const feitasR=(e.sets||[]).filter(temReps);
+  const d=el("div","exdone"+(e.done?"":" ex-pend"));
+  d.setAttribute("role","button");d.tabIndex=0;
+  if(e.done){
+    const pulado=!feitasR.length;
     if(pulado)d.style.borderLeftColor="var(--muted)";
+    const m=melhorSerie(feitasR);
+    const sm=pulado?"pulado":plural(feitasR.length,"série","séries")+(m?" · "+(m.carga?m.txt:m.maxR+" reps"):"");
     d.innerHTML="<span class='ck'"+(pulado?" style='color:var(--muted)'":"")+">"+(pulado?"↷":"✓")+"</span>"+
-      "<span class='nm'>"+esc(e.n)+"</span>"+
-      "<span class='sm'>"+(pulado?"pulado":summarizeSets(doneSets))+"</span>";
-    d.onclick=()=>{e.open=true;persistActive();render();};
-    return d;
+      "<span class='nm'>"+esc(e.n)+"</span><span class='sm'>"+esc(sm)+"</span>";
+    d.setAttribute("aria-label",e.n+", "+(pulado?"pulado":"feito, "+sm)+". Abrir");
+  }else{
+    const alvo=targetSets(e),fe=seriesFeitas(e);
+    const partes=[];if(e.sr)partes.push(e.sr);
+    if(fe)partes.push(alvo?fe+" de "+alvo+" séries":plural(fe,"série","séries"));
+    else{const u=ultimaTxt(e.n);if(u)partes.push(u);}   // histórico não lido: sem "última", nunca "primeira vez"
+    d.innerHTML="<div class='u'><span class='nm'>"+esc(e.n)+"</span><div class='muted'>"+esc(partes.join(" · "))+"</div></div>"+
+      "<span class='chev' aria-hidden='true'>›</span>";
+    d.setAttribute("aria-label",e.n+", "+partes.join(", ")+". Abrir");
   }
+  const abrir=()=>{active.focoId=e.id;persistActive();wantScrollFoco=true;render();};
+  d.onclick=abrir;
+  d.onkeydown=ev=>{if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();abrir();}};
+  return d;
+}
+
+/* Botão principal do foco — spec P8 (b). O que ele faz quando dá "Série N feita": tudo SÍNCRONO
+   no handler, nesta ordem: armAudio() → carimba `t` (só se não houver) e fecha a linha →
+   ultimoExercicioId → startRest(ei). O armAudio no mesmo toque é o que deixa o iOS tocar o
+   alarme (P5.1); depois de um await ou de um render() ele não destrava. */
+function fecharSerie(e,ei){
+  armAudio();
+  const ia=linhaAberta(e);if(ia<0)return;
+  const la=e.sets[ia];
+  if(!la.t)la.t=Date.now();
+  la.f=1;
+  active.ultimoExercicioId=e.id;active.ultimoSetAt=Date.now();
+  startRest(ei);   // grava restTimer e persiste
+  render();
+}
+function addSerie(e){const last=e.sets[e.sets.length-1]||{};e.sets.push({w:last.w||"",r:last.r||""});e.done=false;persistActive();render();}
+function marcarFeito(e){concluir(e);persistActive();render();}
+function acoesFoco(e,ei){
+  const alvo=targetSets(e),feitas=seriesFeitas(e),ia=linhaAberta(e);
+  const algumaReps=(e.sets||[]).some(temReps);
+  const extra=alvo&&feitas>=alvo;
+  const bSerie=[extra?"+ Série extra":"+ Série",()=>addSerie(e),"az"];
+  const bDesc=["▶ Descanso",()=>{armAudio();startRest(ei);render();},"az"];   // o caminho de antes continua (o hábito dos 92 %)
+  const bMarca=algumaReps?["Marcar como feito",()=>marcarFeito(e)]:["Pular exercício",()=>marcarFeito(e)];
+  if(swId&&swExIdx===ei)return {txt:"Descansando…",dis:true,sec:[]};
+  if(e.done&&ia<0)return {txt:"✓ Feito · recolher",run:()=>{if(active.focoId===e.id)delete active.focoId;persistActive();render();},sec:[["+ Série extra",()=>addSerie(e),"az"]]};
+  if(ia>=0){
+    const N=ia+1;
+    if(!temReps(e.sets[ia]))return {txt:"Preencha as reps da série "+N,dis:true,sec:[bSerie,bDesc,bMarca]};
+    const seg=(alvo&&feitas+1>=alvo)?INTER_REST:(e.rest||0);
+    return {txt:"Série "+N+" feita · descansar"+(seg?" "+fmtAlvo(seg):""),run:()=>fecharSerie(e,ei),sec:[bSerie,bDesc,bMarca]};
+  }
+  if(!alvo||feitas<alvo)return {txt:"+ Série "+(e.sets.length+1),run:()=>addSerie(e),sec:[bDesc,bMarca]};
+  return {txt:"Marcar exercício como feito",run:()=>marcarFeito(e),sec:[["+ Série extra",()=>addSerie(e),"az"]]};
+}
+function montaAcoes(box,e,ei){
+  box.innerHTML="";
+  const A=acoesFoco(e,ei);
+  const b=el("button","btn-primary tr-main",esc(A.txt));b.disabled=!!A.dis;if(A.run)b.onclick=A.run;
+  box.appendChild(b);
+  if(A.sec.length){const r=el("div","row tr-sec");
+    A.sec.forEach(([t,fn,cl])=>{const x=el("button","btn-sm"+(cl?" "+cl:""),esc(t));x.onclick=fn;r.appendChild(x);});
+    box.appendChild(r);}
+}
+
+function exCard(e,ei,isActive){
+  /* P1.7 — "feito" só é verdade se sobrou série: exercício marcado sem nenhuma série é `↷ pulado`. */
+  const pulado=!(e.sets||[]).some(temReps);
   const c=el("div","ex"+(isActive?" active":""));
   /* P5.4 — sem tecla de retorno no teclado numérico, não existe "Pronto". Tocar em
      qualquer ponto do próprio cartão que não seja campo nem botão fecha o teclado, em
@@ -1295,15 +1528,13 @@ function exCard(e,ei,isActive){
     if(foco&&foco!==document.body&&foco.blur)foco.blur();
   });
   const head=el("div","ex-head");
-  head.innerHTML="<div><span class='ex-title'>"+esc(e.n)+"</span>"+(e.mvw?"<span class='tag mvw'>🔑 MVW</span>":"")+
+  head.innerHTML="<div style='min-width:0'><span class='ex-title'>"+esc(e.n)+"</span>"+(e.mvw?"<span class='tag mvw'>🔑 MVW</span>":"")+
     (e.done?(pulado?"<span class='tag' style='background:rgba(148,163,184,.15);color:var(--muted)'>↷ pulado</span>"
                    :"<span class='tag' style='background:rgba(34,197,94,.15);color:var(--accent-tx)'>✓ feito</span>"):"")+
-    "<div class='muted'>"+(e.sr?"alvo "+esc(e.sr)+" · ":"sem alvo · ")+"desc "+e.rest+"s</div></div>";   // v1.17.0: opcional nasce sem alvo
-  const doneBtn=el("button","btn-ghost btn-sm",e.done?"▴":"✓");doneBtn.title=e.done?"Recolher":"Marcar como feito";doneBtn.style.flex="0 0 auto";
-  doneBtn.onclick=()=>{e.done=true;e.open=false;persistActive();render();};
-  const demo=el("button","btn-ghost btn-sm","🔍");demo.title="Ver exercício";demo.style.flex="0 0 auto";
+    "<div class='chips'><span class='tag'>"+(e.sr?"alvo "+esc(e.sr):"sem alvo")+"</span><span class='tag'>desc "+esc(e.rest||0)+"s</span></div></div>";
+  const demo=el("button","btn-ghost tr-ic","🔍");demo.setAttribute("aria-label","Ver o exercício "+e.n);
   demo.onclick=()=>openExDemo(e.n);
-  head.appendChild(doneBtn);head.appendChild(demo);
+  head.appendChild(demo);
   c.appendChild(head);
 
   // miniatura opcional (imagem própria colada nos Ajustes)
@@ -1311,58 +1542,57 @@ function exCard(e,ei,isActive){
     im.style.cssText="width:100%;max-height:150px;object-fit:cover;border-radius:8px;margin-bottom:9px";
     im.onerror=()=>im.remove();im.onclick=()=>window.open(e.img,"_blank");c.appendChild(im);}
 
-  // Última vez destacada + histórico recolhível
-  const H=exerciseHistory(e.n);
+  /* Última vez + histórico recolhível. Leitura do histórico falhou: o lastbox não aparece. */
+  const H=readFailed(K.sess)?[]:exerciseHistory(e.n);
   if(H.length){
     const last=H[0];
     const box=el("div","lastbox");
-    box.innerHTML="<div class='lbl'>ÚLTIMA VEZ · "+last.date+"</div>"+
-      "<div class='hl'>"+summarizeSets(last.sets)+"</div>"+
-      "<div class='muted' style='font-size:12px'>máx "+last.top+"kg"+trendChip(H)+" · vol "+Math.round(last.vol)+"</div>";
+    const lh=el("div","lh");
+    lh.innerHTML="<div class='hl' style='margin:0'><div class='lbl'>ÚLTIMA VEZ · "+esc(ddmm(last.date))+"</div>"+esc(resumoTr(last.sets))+trendTr(H)+"</div>";
+    box.appendChild(lh);
     if(H.length>1){
       const more=el("div");more.style.display="none";more.style.marginTop="4px";
       H.slice(1).forEach(h=>{const r=el("div","histrow");
-        r.innerHTML="<span class='hd'>"+h.date+"</span><span class='hs'>"+summarizeSets(h.sets)+"</span>";more.appendChild(r);});
-      const n=H.length-1;const lbl="▾ "+n+" treino"+(n>1?"s":"")+" anterior"+(n>1?"es":"");
-      const t=el("button","btn-ghost btn-sm");t.style.marginTop="7px";t.textContent=lbl;
-      t.onclick=()=>{const open=more.style.display==="none";more.style.display=open?"block":"none";t.textContent=open?"▴ ocultar":lbl;};
-      box.appendChild(t);box.appendChild(more);
+        r.innerHTML="<span class='hd'>"+esc(ddmm(h.date))+"</span><span class='hs'>"+esc(resumoTr(h.sets))+"</span>";more.appendChild(r);});
+      const t=el("button","btn-sm az","histórico ▾");t.style.cssText="background:none;padding:8px 4px;flex:0 0 auto";
+      t.setAttribute("aria-expanded","false");
+      t.onclick=()=>{const open=more.style.display==="none";more.style.display=open?"block":"none";
+        t.textContent=open?"histórico ▴":"histórico ▾";t.setAttribute("aria-expanded",open?"true":"false");};
+      lh.appendChild(t);box.appendChild(more);
     }
     c.appendChild(box);
   }
 
+  const acoes=el("div");
+  if(e.sets.length){
+    const cab=el("div","setrow cab");
+    cab.innerHTML="<div></div><label class='fld'>kg</label><label class='fld'>reps</label><div></div>";
+    c.appendChild(cab);
+  }
+  const ref=H.length?H[0].sets:[];
   e.sets.forEach((s,si)=>{
     const r=el("div","setrow");
-    r.appendChild(el("div","idx",(si+1)));
-    const w=inp(s.w,"kg",v=>{s.w=v;persistActive();updVol(c);});
-    const rp=inp(s.r,"reps",v=>{s.r=v;touchSet(e,s);persistActive();updVol(c);});
+    const feita=!!(s.t&&temReps(s)&&fechada(s));
+    const ix=el("div","idx",(si+1)+(feita?"<b aria-hidden='true'>✓</b>":""));
+    ix.setAttribute("aria-label","série "+(si+1)+(feita?", feita":""));
+    r.appendChild(ix);
+    /* Placeholder da última vez (mesma posição, senão a última série dela) — nunca valor:
+       sugestão não executada entraria no histórico se ele não editasse. */
+    const u=ref[si]||ref[ref.length-1]||null;
+    const phW=u&&!semCarga(u)?String(u.w):"kg", phR=u&&temReps(u)?String(u.r):"reps";
+    const w=inp(s.w,phW,v=>{s.w=v;persistActive();});
+    const rp=inp(s.r,phR,v=>{s.r=v;touchSet(e,s);persistActive();refreshTrProg();montaAcoes(acoes,e,ei);});
+    w.setAttribute("aria-label","kg da série "+(si+1));rp.setAttribute("aria-label","reps da série "+(si+1));
     r.appendChild(w);r.appendChild(rp);
-    const d=el("button","del","×");d.onclick=()=>{e.sets.splice(si,1);persistActive();render();};
+    const d=el("button","del","×");d.setAttribute("aria-label","Apagar a série "+(si+1));
+    d.onclick=()=>{e.sets.splice(si,1);persistActive();render();};
     r.appendChild(d);
     c.appendChild(r);
   });
-
-  // pausas reais registradas
-  const rests=e.sets.map(s=>s.rest).filter(x=>x!=null);
-  if(rests.length){const avg=Math.round(rests.reduce((a,b)=>a+b,0)/rests.length);
-    c.appendChild(el("div","muted","⏱ pausas: "+rests.map(r=>r+"s").join(" · ")+" · méd "+avg+"s"));}
-
-  const bar=el("div","row");bar.style.marginTop="6px";
-  const reached=targetSets(e)&&completedSets(e)>=targetSets(e);
-  const add=el("button","btn-ghost btn-sm",reached?"+ Série extra":"+ Série");
-  add.onclick=()=>{const last=e.sets[e.sets.length-1]||{};e.sets.push({w:last.w||"",r:last.r||""});e.done=false;persistActive();render();};
-  /* P5.1 — este toque é o gesto do usuário que o iOS exige pra liberar o áudio, e é o
-     mesmo toque que inicia a contagem. Sem isto o alarme do fim do descanso não toca. */
-  const rest=el("button","btn-blue btn-sm","▶ Descanso");rest.onclick=()=>{armAudio();startRest(ei);};
-  bar.appendChild(add);bar.appendChild(rest);
-  const vol=el("div","muted");vol.style.marginLeft="auto";vol.dataset.vol="1";vol.textContent=Math.round(setVol(e.sets))+" kg·rep";
-  bar.appendChild(vol);
-  c.appendChild(bar);
+  montaAcoes(acoes,e,ei);
+  c.appendChild(acoes);
   return c;
 }
-function updVol(card){const e=active.exercises[[...$("#app").querySelectorAll(".ex")].indexOf(card)];if(!e)return;
-  const v=card.querySelector("[data-vol]");if(v)v.textContent=Math.round(setVol(e.sets))+" kg·rep";
-  const pv=$("#app").querySelector(".card .muted");}
 /* v1.14.2 — era type="number". O padrão HTML só aceita PONTO como separador decimal:
    no teclado pt-BR o "7,5" chegava com a vírgula descartada e virava 75 — dez vezes a carga,
    sem aviso nenhum. type="text" não sanitiza, então a normalização passa a ser explícita aqui,
@@ -1388,9 +1618,10 @@ let pendingSave=null;   // {sess, v, res} — alimenta a tela de confirmação
 function finishSession(){
   // descarta séries em branco e exercícios que ficaram sem nenhuma série válida
   const exs=active.exercises
-    .map(({done,open,id,...e})=>({...e,sets:(e.sets||[]).filter(st=>String(st.r==null?"":st.r).trim()!=="")}))
+    .map(({done,open,id,...e})=>({...e,sets:(e.sets||[]).filter(st=>String(st.r==null?"":st.r).trim()!=="")
+      .map(({f,...st})=>st)}))   // v1.18.0: `f` (série fechada pelo botão) vive só em active
     .filter(e=>e.sets.length);
-  const {ultimoExercicioId,ultimoSetAt,nextEid,restTimer,...limpo}=active;
+  const {ultimoExercicioId,ultimoSetAt,nextEid,restTimer,focoId,...limpo}=active;   // v1.18.0: focoId também não vai pro histórico
   const sess={...limpo,exercises:exs,finished:Date.now()};
   sess.exercises.forEach(e=>e.sets.forEach(st=>{if(!st.t)st.t=sess.finished;}));
 
@@ -2910,13 +3141,25 @@ function doImport(){
    continua em showMarkdown(), como cópia pra área de transferência. */
 
 /* ============ VERSÃO ============ */
-const APP_VERSION="1.17.0";
+const APP_VERSION="1.18.0";
 const APP_RELEASED="2026-10-05";
 /* Versionamento semântico MAJOR.MINOR.PATCH
    MAJOR = muda o formato dos dados (backup/restore incompatível)
    MINOR = funcionalidade nova, dados compatíveis
    PATCH = correção sem mudar comportamento                        */
 const APP_CHANGELOG=[
+ {v:"1.18.0",d:"2026-10-05",c:[
+   "Treino em andamento redesenhado: um exercício aberto por vez; os outros ficam em linha (feito ✓ com o resumo, pendente com o alvo e a última vez) e um toque abre qualquer um",
+   "A lista não se mexe mais: os feitos ficam no lugar, na ordem em que a sessão abriu",
+   "Cabeçalho fixo no topo: letra, nome, tempo total, 🎵, ? e ⋯, mais a barra de exercícios e 'X de M exercícios · S séries'. Sessão de outro dia mostra 'iniciado em DD/MM' em vez do relógio",
+   "Botão grande junto das séries: 'Série N feita · descansar 1:00' marca a série e começa o descanso (com o alarme liberado no mesmo toque); na última série do alvo ele diz 2:00",
+   "A barra azul só aparece no descanso, diz de qual exercício é e o alvo, e o botão vira 'Próxima série' ou 'Próximo exercício'. O ▶ Descanso de antes continua, como link",
+   "'Próxima série' não troca mais o horário da série pelo fim da pausa: o horário gravado passa a ser o da série. A duração de alguns treinos pode encurtar uns minutos (a última pausa sai)",
+   "Exercício sem carga (Dips, abdômen) nunca mostra '0kg', '?kg' nem '= manteve'",
+   "A instrução da tela aparece só na primeira vez; depois mora atrás do '?'",
+   "Descartar treino saiu do fim da lista e foi para o '⋯' (com o mesmo aviso de antes); todo descarte fica registrado no Diagnóstico — é o primeiro número de 'treino concluído' do app",
+   "Exercício adicionado ou opcional incluído entra no fim e já abre; no treino E o cabeçalho diz 'avulso · não conta na meta da semana'",
+   "Volume e a linha de pausas saíram da tela de treino (continuam na confirmação e no Histórico). Backup continua {templates, sessions, cfg}, igual à v1.17.0"]},
  {v:"1.17.0",d:"2026-10-05",c:[
    "Treino E · Abdômen & Cardio, para o dia em que é só cardio e abdômen: fica fora da ordem do treino recomendado e fora da meta da semana",
    "Na Home, o E é sempre o último tile, na linha inteira, com contorno tracejado: 'avulso · fora da meta · há N dias' — a idade nunca fica laranja",
