@@ -198,6 +198,11 @@ body.wide .histchart{position:sticky;top:18px}
 .cfg-card>:last-child{border-bottom:0}
 .cfg-corpo{padding:4px 0 14px;border-bottom:1px solid var(--border)}
 .cfg-backup{padding:14px 0;border-bottom:1px solid var(--border)}
+.hchips{display:flex;flex-wrap:wrap;gap:8px}
+.hchip{background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:20px;padding:9px 14px;font-size:14px;min-height:40px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hchip.on{background:var(--accent);border-color:var(--accent);color:#0b0f14;font-weight:650}
+select.hchip.todos{width:auto;color:#60a5fa}
+body.light select.hchip.todos{color:#1d4ed8}
 .hm-semana{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;margin:12px 0 10px}
 .hm-semana .lb{font-size:11px;color:var(--muted);margin-bottom:5px}
 .hm-dia{width:36px;height:36px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;background:var(--surface2);font-weight:700;font-size:13px;color:var(--muted)}
@@ -2461,50 +2466,59 @@ function renderHist(a){
 
   const names=[...new Set(sessions.flatMap(s=>s.exercises.map(e=>e.n)))].sort();
   if(!histEx||!names.includes(histEx))histEx=histExPadrao(names);
+  /* v1.26.0 — P8.4: contagem no topo (a mesma conta do Diagnóstico: todas as séries gravadas) */
+  const totSets=sessions.reduce((x,s)=>x+(s.exercises||[]).reduce((b,e)=>b+(e.sets||[]).length,0),0);
+  a.firstChild.outerHTML="<div class='row' style='align-items:center;margin-bottom:10px'><h1 style='margin:0;flex:1'>Histórico</h1><span class='pill' data-hist-total='1'>"+
+    sessions.length.toLocaleString("pt-BR")+(sessions.length===1?" treino":" treinos")+" · "+totSets.toLocaleString("pt-BR")+" séries</span></div>";
 
   /* v1.14.0 — o mesmo gate do render(): aqui vazio e ilegível já saíram acima, então
      `wide` ⇔ desktop. Uma leitura só, pra o layout e a altura do gráfico não divergirem. */
   const wide=document.body.classList.contains("wide");
   const CH=wide?320:200;                          // altura do gráfico, em px CSS
+  const escolhe=n=>{histEx=n;cfg.histEx=histEx;if(!save(K.cfg,cfg))toast("A escolha não foi gravada — ver Diagnóstico");render();};
 
-  const sel=el("select");names.forEach(n=>{const o=el("option",null,esc(n));o.value=n;if(n===histEx)o.selected=true;sel.appendChild(o);});
-  sel.onchange=()=>{histEx=sel.value;cfg.histEx=histEx;
-    if(!save(K.cfg,cfg))toast("A escolha não foi gravada — ver Diagnóstico");
-    render();};
+  /* Chips (spec P8 (c)): exercícios com ≥ 2 sessões COM CARGA (nunca um cujo gráfico ficaria
+     vazio), por nº de sessões nos últimos 90 dias, depois total, depois nome; os 5 primeiros,
+     com o escolhido sempre em 1º. O select de antes vira "Todos os exercícios ▾". */
+  const lim90=maisDias(today(),-90),cont={};
+  sessions.forEach(s=>(s.exercises||[]).forEach(e=>{if(!(topWeight(e.sets||[])>0))return;
+    const o=cont[e.n]||(cont[e.n]={n:0,r:0});o.n++;if(s.date>=lim90)o.r++;}));
+  const elegiveis=Object.keys(cont).filter(n=>cont[n].n>=2&&n!==histEx)
+    .sort((x,y)=>(cont[y].r-cont[x].r)||(cont[y].n-cont[x].n)||(x<y?-1:1));
+  const chipsN=[histEx].concat(elegiveis).slice(0,5);
+  const chips=el("div","hchips");
+  chipsN.forEach(n=>{const b=el("button","hchip"+(n===histEx?" on":""),esc(n));b.dataset.chip=n;b.onclick=()=>{if(n!==histEx)escolhe(n);};chips.appendChild(b);});
+  const sel=el("select","hchip todos");sel.setAttribute("aria-label","Todos os exercícios");
+  {const o0=el("option",null,"Todos os exercícios ▾");o0.value="";o0.selected=true;o0.disabled=true;sel.appendChild(o0);}
+  names.forEach(n=>{const o=el("option",null,esc(n));o.value=n;sel.appendChild(o);});
+  sel.onchange=()=>{if(sel.value)escolhe(sel.value);};
+  chips.appendChild(sel);
   const seg=el("div","seg");
   HIST_METRICAS.forEach(([k,l])=>{const b=el("button",histMetric===k?"active":"",l);
     b.onclick=()=>{histMetric=k;cfg.histMetric=k;
       if(!save(K.cfg,cfg))toast("A escolha não foi gravada — ver Diagnóstico");
       render();};
     seg.appendChild(b);});
-  /* Barra de controle. O lado a lado é SÓ no desktop: em 375px o select mais três botões de
-     métrica na mesma linha deixariam cada botão com ~45px. No celular continuam empilhados,
-     exatamente como estavam. */
-  const selCard=el("div","card full");
-  if(wide){
-    const r=el("div","row");r.style.alignItems="flex-end";
-    const c1=el("div");c1.style.flex="3";c1.appendChild(el("label","fld","Exercício"));c1.appendChild(sel);
-    const c2=el("div");c2.style.flex="2";seg.style.marginBottom="0";c2.appendChild(seg);
-    r.appendChild(c1);r.appendChild(c2);selCard.appendChild(r);
-  }else{
-    selCard.appendChild(el("label","fld","Exercício"));selCard.appendChild(sel);
-    selCard.appendChild(el("div",null,"<div style='height:10px'></div>"));selCard.appendChild(seg);
-  }
+  const selCard=el("div","full");
+  selCard.appendChild(chips);seg.style.margin="10px 0 0";selCard.appendChild(seg);
 
   // data points
-  const pts=[];
+  const all=[];
   sessions.forEach(s=>{const ex=s.exercises.find(e=>e.n===histEx);if(!ex||!ex.sets.length)return;
     let y;if(histMetric==="peso")y=topWeight(ex.sets);
     else if(histMetric==="vol")y=setVol(ex.sets);
     else{y=Math.max(...ex.sets.map(st=>{const w=parseFloat(st.w)||0,r=parseFloat(st.r)||0;return w*(1+r/30);}));}
-    pts.push({x:s.date,y:Math.round(y*10)/10});
+    all.push({x:s.date,y:Math.round(y*10)/10});
   });
   const cc=el("div","card histchart");
   const unit=histMetric==="vol"?"kg·rep":"kg";
   /* `every` num array vazio é true, então isto cobre os dois casos sem gráfico: nenhuma
      série registrada, e séries registradas todas sem carga (peso corporal, prancha). O
      segundo era o pior: desenhava linha reta no zero, que é tendência inventada. */
-  const semCarga=pts.every(p=>p.y===0);
+  const semCarga=all.every(p=>p.y===0);
+  /* v1.26.0 — sessão sem carga no meio (Dips com 0 numa e vazio noutra) desenhava uma queda a
+     zero que não existiu: sai da linha, do recorde e do "manteve", e o rodapé conta quantas. */
+  const pts=all.filter(p=>p.y>0),zeros=all.length-pts.length;
   if(semCarga){
     /* Cicatriz nº2 — "Sem dados para este exercício." era mentira: há sessões, o que não há
        é carga. O .empty ocupa a altura do gráfico pra a grade não pular, e a coluna das
@@ -2519,21 +2533,52 @@ function renderHist(a){
     b.innerHTML="<div class='lbl'>"+esc(histMetricaLbl().toUpperCase())+" · "+esc(pts[0].x)+"</div>"+
       "<div class='hl'>"+pts[0].y+" "+unit+"</div>";
     cc.appendChild(b);
-    cc.appendChild(el("div","muted","1 sessão registrada — a linha aparece a partir da segunda."));
+    cc.appendChild(el("div","muted","1 sessão com carga registrada — a linha aparece a partir da segunda."+(zeros?" "+zeros+(zeros===1?" sessão sem carga não entra.":" sessões sem carga não entram."):"")));
   }else{
-    const cv=el("canvas");cc.appendChild(cv);
-    cc.appendChild(el("div","muted","Último: <b>"+pts[pts.length-1].y+" "+unit+"</b> · primeiro: "+pts[0].y+" "+unit+" · Δ "+(pts[pts.length-1].y-pts[0].y>0?"+":"")+Math.round((pts[pts.length-1].y-pts[0].y)*10)/10+" "+unit));
-    requestAnimationFrame(()=>drawChart(cv,pts,unit,CH,wide?8:5));
+    const ult=pts[pts.length-1];
+    /* KPI + "manteve" (só Carga máx): sessões mais recentes seguidas com a mesma carga máx da
+       última; sem carga no meio já saiu de `pts`, então não quebra a série. Em muted, sem cor. */
+    let mant="";
+    if(histMetric==="peso"){let k=pts.length-1;while(k>0&&pts[k-1].y===ult.y)k--;const N=pts.length-k;
+      if(N>=2)mant="<span class='muted' data-manteve='"+N+"' style='font-size:13px'>= manteve "+nf(ult.y,ult.y%1?1:0)+" kg · "+N+" sessões (desde "+ddmm(pts[k].x)+")</span>";}
+    const kp=el("div");kp.innerHTML="<div class='muted' style='font-size:12px'>"+esc(histMetricaLbl())+"</div>"+
+      "<div class='row' style='align-items:baseline;gap:10px;flex-wrap:wrap'><span style='font-size:30px;font-weight:750' data-hist-kpi='1'>"+nf(ult.y,ult.y%1?1:0)+" "+unit+"</span>"+mant+"</div>";
+    cc.appendChild(kp);
+    // período (cfg.histPeriodo, leitura defensiva como o histMetric)
+    const per=["3m","6m","tudo"].includes(cfg.histPeriodo)?cfg.histPeriodo:"tudo";
+    const ps=el("div","seg hper");ps.style.margin="10px 0";
+    [["3m","3 meses"],["6m","6 meses"],["tudo","Tudo"]].forEach(([k,l])=>{const b=el("button",per===k?"active":"",l);b.dataset.per=k;
+      b.onclick=()=>{cfg.histPeriodo=k;if(!save(K.cfg,cfg))toast("A escolha não foi gravada — ver Diagnóstico");render();};ps.appendChild(b);});
+    cc.appendChild(ps);
+    const desde=per==="3m"?maisDias(today(),-91):per==="6m"?maisDias(today(),-182):"";
+    const vis=pts.filter(p=>p.x>=desde);
+    // recorde: em todas as sessões, maior y > 0, a PRIMEIRA que o atingiu
+    let rec=pts[0];pts.forEach(p=>{if(p.y>rec.y)rec=p;});
+    const recNo=vis.indexOf(rec);
+    const recTxt="recorde "+nf(rec.y,rec.y%1?1:0)+" "+unit+" em "+ddmm(rec.x)+(recNo<0?" · fora do período":"");
+    if(!vis.length){
+      const v=el("div","empty");v.style.minHeight=Math.round(CH*.6)+"px";
+      v.innerHTML="<div>Nenhuma sessão nos últimos "+(per==="3m"?"3":"6")+" meses · última em "+esc(ddmm(ult.x))+"</div>";
+      const b=el("button","btn-ghost btn-sm","Tudo");b.style.marginTop="8px";b.onclick=()=>{cfg.histPeriodo="tudo";save(K.cfg,cfg);render();};v.appendChild(b);
+      cc.appendChild(v);
+      cc.appendChild(el("div","muted","● "+esc(recTxt)));
+    }else{
+      const cv=el("canvas");cc.appendChild(cv);
+      const f=vis[0],l=vis[vis.length-1];
+      cc.appendChild(el("div","muted","<span style='color:var(--warn-tx)'>●</span> "+esc(recTxt)+" · último: <b>"+l.y+" "+unit+"</b> · primeiro"+(per==="tudo"?"":" do período")+": "+f.y+" "+unit+" · Δ "+(l.y-f.y>0?"+":"")+Math.round((l.y-f.y)*10)/10+" "+unit+
+        (zeros?"<br>"+zeros+(zeros===1?" sessão sem carga não entra na linha":" sessões sem carga não entram na linha"):"")));
+      requestAnimationFrame(()=>drawChart(cv,vis,unit,CH,wide?8:5,recNo));
+    }
   }
 
-  // per-session detail (no celular corta em 5 e o resto é recolhível; no desktop, todas)
-  /* A contagem entra no rótulo: é a promessa de que nada está escondido — no desktop porque
-     não corta, no celular porque diz de quantas as 5 visíveis são parte. */
+  // per-session detail (no celular, 4 e "Ver todas ›" expande no lugar; no desktop, todas)
   const col2=el("div");
   const rows=sessions.filter(s=>s.exercises.some(e=>e.n===histEx)).reverse();
-  col2.appendChild(el("h3",null,"Sessões ("+rows.length+")"));
+  const SHOW=wide?rows.length:4;
+  const hh=el("div","row");hh.style.cssText="align-items:center;margin-bottom:8px";
+  hh.innerHTML="<h3 style='margin:0;flex:1'>Sessões ("+rows.length+")</h3>";
+  col2.appendChild(hh);
   const dc=el("div","card");
-  const SHOW=wide?rows.length:5;
   rows.forEach((s,i)=>{
     const ex=s.exercises.find(e=>e.n===histEx);
     const r=el("div","sess");
@@ -2542,13 +2587,16 @@ function renderHist(a){
     dc.appendChild(r);
   });
   if(rows.length>SHOW){
-    const n=rows.length-SHOW;const lbl="▾ ver mais "+n+" sess"+(n>1?"ões":"ão");   // v1.14.0: era "sessão"+"ões" = sessãoões
-    const t=el("button","btn-ghost btn-sm");t.style.width="100%";t.style.marginTop="8px";t.textContent=lbl;
+    const t=el("button","btn-ghost btn-sm az","Ver todas ›");
     t.onclick=()=>{const hidden=[...dc.querySelectorAll(".sess")].slice(SHOW);const open=hidden[0].style.display==="none";
-      hidden.forEach(x=>x.style.display=open?"flex":"none");t.textContent=open?"▴ ocultar":lbl;};
-    dc.appendChild(t);
+      hidden.forEach(x=>x.style.display=open?"flex":"none");t.textContent=open?"Ocultar ‹":"Ver todas ›";};
+    hh.appendChild(t);
   }
   col2.appendChild(dc);
+  /* a aba Análise existe em qualquer aparelho desde a v1.25.0 */
+  const va=el("button","btn-ghost");va.style.cssText="width:100%;text-align:left;margin-bottom:14px";va.textContent="Ver análise completa 📊 →";
+  va.onclick=()=>{analProgEx=histEx;go("analise");};
+  col2.appendChild(va);
 
   /* Fora de body.wide .histgrid não tem regra nenhuma: os três filhos fluem como sempre. */
   const g=el("div","histgrid");
@@ -2557,7 +2605,7 @@ function renderHist(a){
 }
 /* v1.14.0 — H e xdiv viraram parâmetro (eram 200 e 5 fixos): no desktop o gráfico ocupa
    320px e cabem ~8 datas no eixo X em vez de ~5. Sem chamador, os defaults são os de antes. */
-function drawChart(cv,pts,unit,H,xdiv){
+function drawChart(cv,pts,unit,H,xdiv,rec){   // v1.26.0: rec = índice do ponto de recorde (marcado em âmbar)
   H=H||200;xdiv=xdiv||5;
   const dpr=window.devicePixelRatio||1;const W=cv.clientWidth;
   cv.width=W*dpr;cv.height=H*dpr;const ctx=cv.getContext("2d");ctx.scale(dpr,dpr);
@@ -2582,6 +2630,7 @@ function drawChart(cv,pts,unit,H,xdiv){
   // points + x labels
   ctx.fillStyle="#22c55e";
   pts.forEach((p,i)=>{const X=px(i),Y=py(p.y);ctx.beginPath();ctx.arc(X,Y,3.5,0,7);ctx.fill();});
+  if(rec!=null&&rec>=0&&rec<pts.length){ctx.beginPath();ctx.arc(px(rec),py(pts[rec].y),5.5,0,7);ctx.fillStyle="#f59e0b";ctx.fill();}
   ctx.fillStyle="#8b97a6";ctx.textAlign="center";
   const step=Math.ceil(pts.length/xdiv);
   pts.forEach((p,i)=>{if(i%step===0||i===pts.length-1){ctx.fillText(p.x.slice(5),px(i),H-8);}});
@@ -3792,13 +3841,18 @@ function doImport(){
    continua em showMarkdown(), como cópia pra área de transferência. */
 
 /* ============ VERSÃO ============ */
-const APP_VERSION="1.25.0";
+const APP_VERSION="1.26.0";
 const APP_RELEASED="2026-10-07";
 /* Versionamento semântico MAJOR.MINOR.PATCH
    MAJOR = muda o formato dos dados (backup/restore incompatível)
    MINOR = funcionalidade nova, dados compatíveis
    PATCH = correção sem mudar comportamento                        */
 const APP_CHANGELOG=[
+ {v:"1.26.0",d:"2026-10-07",c:[
+   "Histórico: total de treinos e séries no topo; atalhos (chips) para os 5 exercícios mais feitos com carga nos últimos 90 dias, com o escolhido sempre em 1º, e 'Todos os exercícios ▾' para os demais",
+   "Número grande da métrica com '= manteve 42 kg · 15 sessões (desde 08/04)' quando a carga máxima não muda; período 3 meses · 6 meses · Tudo (fica gravado)",
+   "O recorde aparece marcado no gráfico; se estiver fora do período escolhido, o rodapé diz. Sessão sem carga não desenha mais uma queda a zero: sai da linha e o rodapé conta quantas",
+   "Sessões mostram 4 com 'Ver todas ›'; 'Ver análise completa 📊 →' abre a Análise no mesmo exercício"]},
  {v:"1.25.0",d:"2026-10-07",c:[
    "📊 Análise virou a 3ª aba também no celular (Treinar · Histórico · Análise · Ajustes). Os cartões ficam numa coluna e os KPIs em duas",
    "O painel do cut continua só no desktop; no celular, uma linha diz que ele existe lá",
