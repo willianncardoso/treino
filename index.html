@@ -148,6 +148,15 @@ body.light .tabbar{background:rgba(255,255,255,.92)}
 body.wide .wrap{max-width:1180px}
 .dashgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px}
 .dashgrid .full{grid-column:1 / -1}
+/* v1.22.0 — painel do cut (P12): uma linha por regra do plano; o chip diz o estado, nunca só a cor */
+.cut .cut-row{display:grid;grid-template-columns:230px 1fr;gap:16px;padding:12px 0;border-top:1px solid var(--border);font-size:14px}
+.cut .cut-row .rt{font-weight:650;font-size:14px;margin-bottom:5px}
+.cut .cut-row .rr{color:var(--muted);font-size:12px;margin-top:4px}
+.cchip{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--surface2);color:var(--muted)}
+.cchip.w{background:rgba(245,158,11,.15);color:var(--warn-tx)}
+.cchip.a{background:rgba(34,197,94,.14);color:var(--accent-tx)}
+.cchip.b{background:rgba(59,130,246,.15);color:#60a5fa}
+body.light .cchip.b{color:#1d4ed8}
 /* v1.14.0 — Histórico em painel no desktop. NÃO reusa .dashgrid de propósito: o auto-fit
    minmax(360px,1fr) daria três colunas iguais de ~360px em 1180px, com o gráfico do tamanho
    da lista e um buraco na terceira. Aqui a proporção é decisão, não resultado do auto-fit.
@@ -2508,6 +2517,209 @@ const MESN=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","d
 function fmtD(s){const p=String(s||"").split("-");if(p.length<3)return s;return (+p[2])+" "+(MESN[(+p[1])-1]||p[1])+"/"+p[0].slice(2);}
 function arrow(d,good){if(d==null||Math.abs(d)<0.05)return"<span class='trend eq'>=</span>";const up=d>0;const cls=(up===good)?"up":"dn";return "<span class='trend "+cls+"'>"+(up?"↑":"↓")+" "+(d>0?"+":"")+r1(d)+"</span>";}
 
+/* ===== v1.22.0 — P12 · Análise com foco em gordura (Opção C + trocas da A) =====
+   Spec: "Spec — Análise com foco em gordura (2026-10-07)". NENHUM número de peso, gordura ou
+   meta do cut neste arquivo (o repo é público): as regras chegam por cfg.cut, do arquivo do
+   ciclo, e todo valor sai do apple_health.json. Sem cfg.cut o painel não existe (não fica vazio).
+   cfg.cut = {inicio:"AAAA-MM-DD", fim?, ritmoKgSemana?, pesagensSemana?, semanasParada?,
+              paradaKg?, plano?, marcos?:[{d,t}]} — tudo opcional menos o início. */
+const JANELA_TEND=28;          // dias da tendência (KPIs e linha): Q3 do quadro R
+/* Média dos valores nos 28 dias que terminam no `fim` (inclusive). Sem `fim`, termina no último
+   dado da série — a tela diz até quando, porque "últimos 28 dias" de uma série parada há uma
+   semana não são os últimos 28 dias do calendário. */
+function janelaTend(m,fim){const ks=Object.keys(m||{}).sort();if(!ks.length)return null;
+  const end=fim||ks[ks.length-1],ini=maisDias(end,-(JANELA_TEND-1));
+  const sel=ks.filter(k=>k>=ini&&k<=end);
+  return sel.length?{ini:ini,end:end,n:sel.length,media:sel.reduce((s,k)=>s+m[k],0)/sel.length}:null;}
+/* massa gorda (kg) = peso × % do MESMO dia; dia sem os dois não vira ponto */
+function massaGorda(bm,bf){const o={};for(const k in (bf||{}))if(bm&&bm[k]!=null)o[k]=bm[k]*bf[k]/100;return o;}
+function porSemana(m){const W={};for(const k in (m||{})){const w=segundaDe(k);(W[w]=W[w]||{n:0,s:0}).n++;W[w].s+=m[k];}
+  for(const w in W)W[w].media=W[w].s/W[w].n;return W;}
+function fimExport(H){let mx=null;for(const k in (H&&H.daily)||{}){const l=latestVal(H.daily[k]);if(l&&(!mx||l.d>mx))mx=l.d;}return mx;}
+const DIA_SEM=["domingo","segunda","terça","quarta","quinta","sexta","sábado"];
+function diaSem(ds){const p=String(ds).split("-");return DIA_SEM[new Date(+p[0],+p[1]-1,+p[2]).getDay()];}
+function dm(ds){const p=String(ds||"").split("-");return p.length===3?(+p[2])+"/"+(+p[1]):String(ds||"");}
+function nf(x,d){return x==null?"—":Number(x).toLocaleString("pt-BR",{minimumFractionDigits:d||0,maximumFractionDigits:d||0});}
+/* faixa "4×8-10", "3×8-10 cada", "3×15 drop" → mínimo de reps (8, 8, 15); sem faixa → null */
+function listaE(a){return a.length<2?a.join(""):a.slice(0,-1).join(", ")+" e "+a[a.length-1];}
+function minFaixa(sr){const m=String(sr||"").match(/×\s*(\d+)/);return m?+m[1]:null;}
+let cutPlot=null;              // dados do gráfico do painel, montados junto com o cartão
+function cutCfg(){const c=cfg&&cfg.cut;if(c==null)return null;
+  if(typeof c!=="object"||!/^\d{4}-\d{2}-\d{2}$/.test(c.inicio||""))return {invalido:true};
+  const num=(v,d)=>(typeof v==="number"&&isFinite(v))?v:d;
+  return {inicio:c.inicio,fim:/^\d{4}-\d{2}-\d{2}$/.test(c.fim||"")?c.fim:null,
+    ritmo:num(c.ritmoKgSemana,null),pesagens:num(c.pesagensSemana,null),semParada:num(c.semanasParada,null),
+    parada:num(c.paradaKg,null),plano:typeof c.plano==="string"?c.plano:null,
+    marcos:Array.isArray(c.marcos)?c.marcos.filter(x=>x&&/^\d{4}-\d{2}-\d{2}$/.test(x.d||"")).map(x=>({d:x.d,t:String(x.t||"")})):[]};}
+function cardCut(H,sessFail){
+  cutPlot=null;
+  const C=cutCfg();if(!C)return null;
+  const c=el("div","card cut");c.style.margin="0 0 14px";c.dataset.cut="1";
+  if(C.invalido){c.innerHTML="<h3 style='margin:0 0 4px'>Painel do cut</h3><div style='color:var(--warn-tx);font-weight:650'>O cfg.cut deste navegador não tem um início válido (AAAA-MM-DD) — o painel não consegue ler as regras.</div><div class='muted' style='font-size:12px'>Ele vem do arquivo do ciclo; nada foi alterado.</div>";return c;}
+  const hoje=today(),s0=segundaDe(hoje),wIni=segundaDe(C.inicio);
+  const bm=H&&H.daily&&H.daily.BodyMass_kg||null,ae=H&&H.daily&&H.daily.ActiveEnergy_kcal||null;
+  const fimEx=H?fimExport(H):null,pesoAte=bm?(latestVal(bm)||{}).d:null;
+  const chip=(cls,t)=>"<span class='cchip"+(cls?" "+cls:"")+"'>"+t+"</span>";
+  const linha=(nome,ch,txt,regra,key)=>"<div class='cut-row' data-regra='"+key+"'><div><div class='rt'>"+nome+"</div>"+ch+"</div><div><div>"+txt+"</div>"+(regra?"<div class='rr'>"+regra+"</div>":"")+"</div></div>";
+  const semH=chip("","SEM APPLE HEALTH"),txtH="Carregue o <b>apple_health.json</b> para ver peso e pesagens (botão no topo da página).";
+  const ausente=k=>"A chave <b>"+k+"</b> não veio neste <code>apple_health.json</code>.";
+  // cabeçalho
+  const ciclo=esc(cfg.ciclo||"ciclo");
+  let semTxt;
+  if(hoje<C.inicio)semTxt="começa "+dm(C.inicio);
+  else if(C.fim&&hoje>C.fim)semTxt="encerrado em "+dm(C.fim);
+  else{const k=Math.floor((new Date(s0)-new Date(wIni))/864e5/7)+1;
+    const tot=C.fim?Math.floor((new Date(segundaDe(C.fim))-new Date(wIni))/864e5/7)+1:null;semTxt="semana "+k+(tot?" de "+tot:"");}
+  const ultTreino=sessions.map(s=>s&&s.date).filter(Boolean).sort().pop();
+  const fontes=[C.plano?"regras do plano "+esc(C.plano):"regras do cfg.cut"].concat(C.marcos.map(m=>esc(m.t)+" "+dm(m.d)),
+    [H?"Apple Health até "+dm(fimEx)+(pesoAte?" (peso até "+dm(pesoAte)+")":""):"Apple Health não carregado",
+     sessFail?"treinos não lidos":(ultTreino?"treinos até "+dm(ultTreino):"sem treinos")]);
+  let h="<div class='row' style='gap:10px;align-items:center'><h3 style='margin:0'>"+ciclo+" · cut — o que o plano manda olhar</h3>"+chip("b",semTxt)+"</div>"+
+    "<div class='muted' style='font-size:12px;margin:6px 0 4px'>"+fontes.join(" · ")+"</div>";
+  // semanas
+  const W=bm?porSemana(bm):{};
+  const semanasCut=[];if(hoje>=C.inicio){for(let w=wIni;w<=s0&&(!C.fim||w<=C.fim);w=maisDias(w,7))semanasCut.push(w);}
+  const completas=semanasCut.filter(w=>w<s0);
+  /* a base do tracejado: a semana de início, se já tem 2+ pesagens; senão a última semana antes
+     dela com 2+ (o cálculo é do dado — o arquivo não carrega peso nenhum) */
+  let base=null;
+  if(bm){if(W[wIni]&&W[wIni].n>=2)base={w:wIni,v:W[wIni].media,ini:true};
+    else{const ant=Object.keys(W).filter(w=>w<wIni&&W[w].n>=2).sort().pop();if(ant)base={w:ant,v:W[ant].media,ini:false};}}
+  const PAR=C.parada!=null?nf(C.parada,1)+" kg":"&lt;A DEFINIR&gt;";
+  const ritmoTxt=C.ritmo!=null?"~"+nf(Math.abs(C.ritmo),1)+" kg/semana":null;
+  const ultMarco=C.marcos.length?C.marcos[C.marcos.length-1]:null;
+  const alvoW=ultMarco?segundaDe(ultMarco.d):(C.fim?segundaDe(C.fim):null);
+  const semEntre=(a,b)=>Math.round((new Date(b)-new Date(a))/864e5/7);
+  /* o tracejado começa na semana de início do cut, com o valor da base (venha ela de onde vier) */
+  const esperado=w=>(base&&C.ritmo!=null&&w>=wIni)?base.v+C.ritmo*semEntre(wIni,w):null;
+  const proj=alvoW?esperado(alvoW):null;
+  const regraPeso="Regra: média semanal parada por "+(C.semParada!=null?C.semParada:"&lt;A DEFINIR&gt;")+" semanas → −150 kcal de carboidrato nos dias de cardio e descanso. Parada = caiu menos de "+PAR+" de uma semana para a outra, com ≥ 2 pesagens nas duas."+
+    (ritmoTxt?" Ritmo esperado do plano: "+ritmoTxt+(proj!=null?" (~"+nf(proj,1)+" kg "+(ultMarco&&segundaDe(ultMarco.d)===alvoW?"na "+esc(ultMarco.t):"no fim do cut")+")":"")+".":"");
+  // 1 · média semanal de peso
+  if(!H)h+=linha("Média semanal de peso",semH,txtH,regraPeso,"peso");
+  else if(!bm)h+=linha("Média semanal de peso",chip("","SEM PESO NO EXPORT"),ausente("BodyMass_kg"),regraPeso,"peso");
+  else{
+    const noCut=Object.keys(bm).filter(k=>k>=C.inicio&&(!C.fim||k<=C.fim));
+    const antes=[1,2,3,4].map(i=>maisDias(wIni,-7*i)).reverse();
+    const antesTxt="Nas 4 semanas antes do cut: "+antes.map(w=>W[w]?nf(W[w].media,1):"—").join(" · ")+" kg (pesagens "+antes.map(w=>W[w]?W[w].n:0).join(" · ")+").";
+    let ch,txt;
+    if(hoje<C.inicio){ch=chip("","CUT AINDA NÃO COMEÇOU");txt=antesTxt;}
+    else if(!noCut.length){ch=chip("w","SEM PESAGEM NO CUT");txt="Nenhuma pesagem desde "+dm(C.inicio)+(pesoAte?" (última: "+dm(pesoAte)+")":"")+". "+antesTxt;}
+    else{
+      const ws=semanasCut.filter(w=>W[w]);const lw=ws[ws.length-1];
+      const esp=esperado(lw);
+      txt="Semana de "+dm(lw)+": <b>"+nf(W[lw].media,1)+" kg</b> ("+W[lw].n+(W[lw].n===1?" pesagem: não decide":" pesagens")+")"+(esp!=null?" · plano: "+nf(esp,1)+" kg":"")+".";
+      const semP=semanasCut.filter(w=>!W[w]);if(semP.length)txt+=" Sem pesagem: semana"+(semP.length>1?"s":"")+" de "+semP.map(dm).join(", ")+".";
+      // a regra só decide com semanas completas, todas com 2+ pesagens, e a anterior também
+      const N=C.semParada;let disp=false,decide=false;
+      if(C.parada!=null&&N!=null&&completas.length>=N){
+        const ult=completas.slice(-N);
+        decide=ult.every(w=>W[w]&&W[w].n>=2&&W[maisDias(w,-7)]&&W[maisDias(w,-7)].n>=2);
+        disp=decide&&ult.every(w=>W[w].media-W[maisDias(w,-7)].media>-C.parada);}
+      if(disp)ch=chip("w","PARADA "+N+" SEMANAS → −150 KCAL");
+      else if(C.parada==null||N==null)ch=chip("","LIMIAR &lt;A DEFINIR&gt;");
+      else if(!decide)ch=chip("","AINDA NÃO DECIDE");
+      else ch=chip("a","CAINDO");}
+    h+=linha("Média semanal de peso",ch,txt,regraPeso,"peso");}
+  // 2 · pesagens nesta semana
+  const meta=C.pesagens;
+  const regraPes="Regra: pesar em jejum "+(meta!=null?meta:"&lt;A DEFINIR&gt;")+" manhãs por semana e decidir pela média. Semana com menos de 2 pesagens não decide nada.";
+  if(!H)h+=linha("Pesagens nesta semana",semH,txtH,regraPes,"pesagens");
+  else if(!bm)h+=linha("Pesagens nesta semana",chip("","SEM PESO NO EXPORT"),ausente("BodyMass_kg"),regraPes,"pesagens");
+  else{
+    const ateLido=fimEx<hoje?fimEx:hoje;
+    const dias=ateLido<s0?0:Math.round((new Date(ateLido)-new Date(s0))/864e5)+1;
+    const n=W[s0]?W[s0].n:0;
+    const ult12=[];for(let i=12;i>=1;i--)ult12.push(maisDias(s0,-7*i));
+    const cheias=meta!=null?ult12.filter(w=>W[w]&&W[w].n>=meta).length:null;
+    const ch=dias===0?chip("w","SEMANA NÃO LIDA"):chip(meta!=null&&n>=meta?"a":"w",n+(meta!=null?" de "+meta:" pesagens")+" · "+dias+(dias===1?" dia lido":" dias lidos"));
+    const txt=(dias===0?"Nenhum dia desta semana no export: ele vai até "+diaSem(fimEx)+" "+dm(fimEx)+".":"O export vai até "+diaSem(fimEx)+" "+dm(fimEx)+".")+
+      (cheias!=null?" Das últimas 12 semanas, "+cheias+(cheias===1?" teve ":" tiveram ")+meta+" pesagens ou mais.":"");
+    h+=linha("Pesagens nesta semana",ch,txt,regraPes,"pesagens");}
+  // 3 · força dos 🔑
+  const regraF="Regra: reps de um 🔑 abaixo da faixa em 2 sessões seguidas → volta a carga anterior; em mais de um básico por 2 semanas → sobem as calorias do dia de treino. Abaixo da faixa = na carga mais alta da sessão, nenhuma série chegou ao mínimo da faixa.";
+  if(sessFail)h+=linha("Força dos 🔑 no cut",chip("","HISTÓRICO NÃO LIDO"),"histórico não lido — ver Ajustes → Diagnóstico de dados.",regraF,"forca");
+  else{
+    const sc=sessions.filter(s=>s&&s.date>=C.inicio&&(!C.fim||s.date<=C.fim)&&s.avulso!==true).slice().sort((x,y)=>x.date<y.date?-1:1);
+    const L=letrasRotacao();
+    const prim=l=>(sc.find(s=>s.day===l)||{}).date;   // ordem de quando a letra apareceu no cut
+    const com=L.filter(l=>prim(l)).sort((x,y)=>prim(x)<prim(y)?-1:1),sem=L.filter(l=>!prim(l));
+    let txt="Sessões no "+ciclo+": "+(com.length?com.map(l=>esc(l)+" "+sc.filter(s=>s.day===l).map(s=>dm(s.date)).join(", ")).join(" · "):"nenhuma")+
+      (sem.length?"; "+listaE(sem.map(esc))+" nenhuma":"")+".";
+    const porEx={};
+    sc.forEach(s=>(s.exercises||[]).forEach(e=>{if(!e||!e.mvw)return;const mn=minFaixa(e.sr);if(mn==null)return;
+      const st=(e.sets||[]).map(x=>({w:parseFloat(x.w)||0,r:parseFloat(x.r)||0})).filter(x=>x.r>0);if(!st.length)return;
+      const top=Math.max.apply(null,st.map(x=>x.w)),rTop=Math.max.apply(null,st.filter(x=>x.w===top).map(x=>x.r));
+      (porEx[e.n]=porEx[e.n]||[]).push({d:s.date,abaixo:rTop<mn,r:rTop,mn:mn});}));
+    const comp=Object.keys(porEx).filter(n=>porEx[n].length>=2);
+    const disp=comp.filter(n=>{const v=porEx[n].slice(-2);return v[0].abaixo&&v[1].abaixo;});
+    const lim=maisDias(hoje,-13),disp14=disp.filter(n=>porEx[n][porEx[n].length-1].d>=lim);
+    let ch;
+    if(!comp.length){ch=chip("","SEM COMPARAÇÃO AINDA");txt+=" A comparação começa na 2ª sessão da letra.";}
+    else{
+      if(disp14.length>1)ch=chip("w","SOBEM AS CALORIAS DO TREINO");
+      else if(disp.length)ch=chip("w","VOLTAR A CARGA: "+disp.length);
+      else ch=chip("a","NENHUM 🔑 ABAIXO 2×");
+      txt+=" "+comp.length+" 🔑 com 2+ sessões no cut"+(disp.length?"; abaixo da faixa nas 2 últimas: "+disp.map(n=>"<b>"+esc(n)+"</b> ("+porEx[n].slice(-2).map(x=>x.r+" reps").join(", ")+"; mínimo "+porEx[n][0].mn+")").join(" · "):"")+".";}
+    h+=linha("Força dos 🔑 no cut",ch,txt,regraF,"forca");}
+  // 4 · calorias ativas — contexto, não alavanca (Q7)
+  const regraA="Contexto, não alavanca: na medição de 07/10/2026 (11 meses), mês de mais caloria ativa não foi mês de menos gordura. O que move a gordura é o que se come, e isso o app não registra.";
+  if(!H)h+=linha("Calorias ativas",chip("","SEM APPLE HEALTH"),"Carregue o <b>apple_health.json</b> para ver as calorias ativas.",regraA,"calorias");
+  else if(!ae)h+=linha("Calorias ativas",chip("","SEM DADO NO EXPORT"),ausente("ActiveEnergy_kcal"),regraA,"calorias");
+  else{
+    const A=porSemana(ae),wl=maisDias(s0,-7);
+    let ch,txt;
+    if(!A[wl]){ch=chip("","SEM DADO NA SEMANA DE "+dm(wl));txt="Último dia lido: "+dm((latestVal(ae)||{}).d)+".";}
+    else{
+      const doze=[];for(let i=11;i>=0;i--){const w=maisDias(wl,-7*i);if(A[w])doze.push({w:w,v:A[w].media});}
+      const ant=doze.filter(x=>x.w!==wl),v=A[wl].media;
+      const pos=doze.filter(x=>x.v>v).length+1;
+      const rank=pos===1?"A maior":(pos===doze.length?"A menor":"A "+pos+"ª maior");
+      txt=rank+" das últimas "+doze.length+" semanas com dado"+(ant.length?" (as "+ant.length+" anteriores: "+nf(ant.reduce((s,x)=>s+x.v,0)/ant.length)+")":"")+". ";
+      txt+=A[s0]?"Semana de "+dm(s0)+": "+A[s0].n+(A[s0].n===1?" dia lido":" dias lidos")+" ("+nf(A[s0].media)+").":"Semana de "+dm(s0)+": nenhum dia lido (export até "+dm(fimEx)+").";
+      ch=chip("a",nf(v)+" kcal/dia na semana de "+dm(wl));}
+    h+=linha("Calorias ativas",ch,txt,regraA,"calorias");}
+  c.innerHTML=h;
+  // gráfico: média semanal × plano
+  if(H&&bm){
+    const ini=maisDias(wIni,-7*8),fimW=alvoW&&alvoW>s0?alvoW:maisDias(s0>wIni?s0:wIni,7);
+    const labels=[];for(let w=ini;w<=fimW;w=maisDias(w,7))labels.push(w);
+    const pts=labels.map(w=>W[w]?{v:W[w].media,n:W[w].n}:null);
+    const plano=(base&&C.ritmo!=null)?labels.map(esperado):null;
+    const g=el("div");g.style.marginTop="12px";
+    g.innerHTML="<div style='font-weight:650;font-size:14px'>Média semanal do peso (kg) — o número que a regra usa</div>"+
+      "<div class='muted' style='font-size:12px;margin:2px 0 8px'>ponto cheio = 2+ pesagens na semana · vazado = 1 (não decide) · número sob o ponto = pesagens"+
+      (plano?" · tracejado = ritmo esperado do plano a partir de "+nf(base.v,1)+" kg (média da semana de "+dm(base.w)+(base.ini?", a do início do cut":", a última antes do cut com 2+ pesagens")+")":" · sem tracejado: "+(C.ritmo==null?"o cfg.cut não tem ritmoKgSemana":"nenhuma semana com 2+ pesagens para servir de base"))+"</div>";
+    if(pts.some(Boolean)){const wr=el("div");wr.style.cssText="position:relative;height:240px";const cv=el("canvas");cv.id="cCut";wr.appendChild(cv);g.appendChild(wr);
+      cutPlot={labels:labels,pts:pts,plano:plano,marcos:[{d:C.inicio,t:"cut "+dm(C.inicio)}].concat(C.marcos.map(m=>({d:m.d,t:m.t+" "+dm(m.d)}))),ritmo:C.ritmo};}
+    else g.appendChild(el("div","empty","<div>Nenhuma pesagem entre "+dm(ini)+" e "+dm(fimW)+" — sem ponto para desenhar.</div>"));
+    const semP=semanasCut.filter(w=>!W[w]);
+    if(semP.length){const n=el("div","muted");n.style.cssText="font-size:12px;margin-top:4px";n.textContent="sem pesagem: "+semP.map(w=>"semana "+(Math.round((new Date(w)-new Date(wIni))/864e5/7)+1)+" ("+dm(w)+")").join(" · ");g.appendChild(n);}
+    c.appendChild(g);}
+  return c;
+}
+function buildCutChart(){
+  if(!window.Chart||!cutPlot||!document.getElementById("cCut"))return;
+  const P=cutPlot,cs=getComputedStyle(document.body);
+  const TX=cs.getPropertyValue("--text").trim()||"#e6edf3",SF=cs.getPropertyValue("--surface").trim()||"#141b24",
+        MU=cs.getPropertyValue("--muted").trim()||"#8b97a6",GR=cs.getPropertyValue("--accent-tx").trim()||"#22c55e",BL="#3b82f6";
+  const idx=d=>{const w=segundaDe(d);return P.labels.indexOf(w);};
+  const marcas={id:"cutMarcas",afterDatasetsDraw(ch){const {ctx,chartArea:a,scales:{x,y}}=ch;ctx.save();ctx.font="11px -apple-system,sans-serif";
+    P.marcos.forEach((m,i)=>{const k=idx(m.d);if(k<0)return;const X=x.getPixelForValue(k);ctx.strokeStyle=i===0?BL:MU;ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo(X,a.top);ctx.lineTo(X,a.bottom);ctx.stroke();ctx.fillStyle=i===0?BL:MU;const tw=ctx.measureText(m.t).width;ctx.fillText(m.t,X+4+tw>a.right?X-4-tw:X+4,a.top+10);});
+    const meta=ch.getDatasetMeta(0);ctx.fillStyle=MU;ctx.textAlign="center";
+    P.pts.forEach((p,i)=>{if(!p||!meta.data[i])return;ctx.fillText(String(p.n),meta.data[i].x,meta.data[i].y+18);});
+    ctx.restore();}};
+  const cv=document.getElementById("cCut");
+  charts.push(new Chart(cv.getContext("2d"),{type:"line",data:{labels:P.labels,datasets:[
+    {label:"Média semanal (kg)",data:P.pts.map(p=>p?Math.round(p.v*100)/100:null),borderColor:TX,borderWidth:2,tension:0,spanGaps:true,
+     pointRadius:5,pointBorderWidth:2,pointBorderColor:TX,pointBackgroundColor:P.pts.map(p=>p&&p.n>=2?TX:SF),pesagens:P.pts.map(p=>p?p.n:0)},
+    ...(P.plano?[{label:"plano: "+(P.ritmo>0?"+":"−")+nf(Math.abs(P.ritmo),1)+" kg/sem",data:P.plano.map(v=>v==null?null:Math.round(v*100)/100),borderColor:GR,borderDash:[6,5],borderWidth:2,pointRadius:0,spanGaps:false}]:[])
+  ]},options:{maintainAspectRatio:false,layout:{padding:{top:14,right:8}},interaction:{mode:"index",intersect:false},
+    plugins:{tooltip:{callbacks:{label:it=>it.datasetIndex===0?"média "+nf(it.parsed.y,1)+" kg · "+P.pts[it.dataIndex].n+" pesagem(ns)":it.dataset.label+": "+nf(it.parsed.y,1)+" kg"}}},
+    scales:{x:{ticks:{color:MU,callback:function(v){return dm(this.getLabelForValue(v));}}},y:{ticks:{color:MU},title:{display:true,text:"kg",color:MU}}}},
+    plugins:[marcas]}));
+}
 function renderAnalise(a){
   destroyCharts();
   const sess=normSessions();
@@ -2517,13 +2729,19 @@ function renderAnalise(a){
   const head=el("div","row");head.innerHTML="<div style='flex:1'><h1>Análise</h1><div class='muted'>"+(sessFail?"<b style='color:var(--danger-tx)'>histórico não lido</b>":sess.length+" sessões")+" · Apple Health "+(H?"carregado ✓":"não carregado")+" · dados só neste navegador</div></div>";
   const fi=el("input");fi.type="file";fi.accept=".json";fi.style.display="none";
   fi.onchange=()=>{const f=fi.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);
-    if(d.daily){save(K_HEALTH,d);toast("Apple Health carregado ✓");render();}else toast("Carregue o apple_health.json");}catch(e){toast("JSON inválido");}};rd.readAsText(f);};
+    /* v1.22.0 — o ✓ saía sem olhar o save(): sem espaço, a tela dizia "carregado" e nada ficava gravado. */
+    if(d.daily){if(save(K_HEALTH,d)){toast("Apple Health carregado ✓");render();}
+      else alert("O apple_health.json NÃO foi gravado neste navegador (falhou ao salvar).\nVer Ajustes → Diagnóstico de dados.");}
+    else toast("Carregue o apple_health.json");}catch(e){toast("JSON inválido");}};rd.readAsText(f);};
   const lb=el("button","btn-ghost btn-sm",H?"🔄 Trocar Apple Health":"⬆ Carregar Apple Health");lb.onclick=()=>fi.click();
   const th=el("button","btn-ghost btn-sm",cfg.theme==="light"?"🌙 Escuro":"☀️ Claro");
   th.onclick=()=>{cfg.theme=(cfg.theme==="light")?"dark":"light";save(K.cfg,cfg);applyTheme();render();};
   head.appendChild(th);head.appendChild(lb);head.appendChild(fi);a.appendChild(head);
+  /* v1.22.0 — painel do cut no topo, só com cfg.cut; antes do "sem histórico" de propósito:
+     histórico ilegível não esconde as linhas de peso, só a dos 🔑 diz que não leu */
+  const cutC=cardCut(H,sessFail);if(cutC)a.appendChild(cutC);
 
-  if(!sess.length){a.appendChild(el("div","empty",sessFail
+  if(!sess.length){if(cutPlot)ensureChart(buildCutChart);a.appendChild(el("div","empty",sessFail
     ?"<div class='ic'>⚠️</div><div>O histórico não pôde ser lido — <b>"+esc(sessFail)+"</b>.<br>Nada foi apagado, e a cópia bruta está preservada. Ver <b>Ajustes → Diagnóstico de dados</b> <u>antes</u> de importar por cima.</div>"
     :"<div class='ic'>📊</div><div>Sem treinos carregados neste navegador.<br>Vá em <b>Ajustes → ⬆ Importar</b> e carregue seu <b>treino-restore.json</b>.</div>"));return;}
 
@@ -2535,11 +2753,23 @@ function renderAnalise(a){
     +kpi("Freq. (8 sem)",(last56/8).toFixed(1)+"/sem","")
     +kpi("Volume total",Math.round(sess.reduce((a,s)=>a+s.vol,0)/1000)+"k","kg·rep");
   if(H){const bm=H.daily.BodyMass_kg||{},bf=bfPct(H.daily.BodyFatPercentage),lm=H.daily.LeanBodyMass_kg||{};
-    const lw=latestVal(bm),lf=latestVal(bf),ll=latestVal(lm);const g=goals();
+    const lw=latestVal(bm);const g=goals();
     const gTxt=(v,range,unit)=>{if(v==null)return"";const[lo,hi]=range;if(v>=lo&&v<=hi)return "<b style='color:var(--accent-tx)'>🎯 na meta</b>";const falta=r1(v>hi?v-hi:lo-v);return "meta "+lo+"–"+hi+unit+" · falta "+falta+unit;};
+    /* v1.22.0 (trocas da A) — Gordura, Massa gorda e Massa magra são a MÉDIA DE 28 DIAS que
+       termina na última pesagem, com quantas pesagens entraram e até quando; antes era a última
+       pesagem, que oscila 1 ponto de um dia para o outro. Sem pesagem: "—" com o motivo, nunca 0.
+       A seta compara com a média de 28 dias que terminava 90 dias antes, só quando ela existe. */
+    const kTend=(rot,m,un,bom,metaTxt,chave)=>{
+      const t=janelaTend(m);if(!t)return kpi(rot,"—","<b>"+chave+"</b> sem pesagem neste export");
+      const t0=janelaTend(m,maisDias(t.end,-90));
+      return kpi(rot,r1(t.media)+un,(t0?arrow(t.media-t0.media,bom)+" · ":"")+metaTxt(t.media)+
+        "<div data-tend='"+chave+"'>méd 28 d até "+fmtD(t.end)+" · "+t.n+(t.n===1?" pesagem":" pesagens")+"</div>");};
     html+=kpi("Peso",r1(lw&&lw.v)+" kg",arrow(lw&&lw.v-valAgo(bm,90),false)+" · "+gTxt(lw&&lw.v,g.weight,"kg"))
-      +kpi("Gordura",r1(lf&&lf.v)+"%",arrow(lf&&lf.v-valAgo(bf,90),false)+" · "+gTxt(lf&&lf.v,g.fat,"%"))
-      +kpi("Massa magra",r1(ll&&ll.v)+" kg",arrow(ll&&ll.v-valAgo(lm,90),true)+" · "+((ll&&ll.v>=g.lean)?"<b style='color:var(--accent-tx)'>🎯 ≥"+g.lean+"</b>":"meta ≥"+g.lean+"kg"))
+      +kTend("Gordura",bf,"%",false,v=>gTxt(v,g.fat,"%"),"BodyFatPercentage")
+      +kTend("Massa gorda",massaGorda(bm,bf)," kg",false,()=>"peso × % do mesmo dia","massa gorda")
+      +kTend("Massa magra",lm," kg",true,v=>(v>=g.lean)?"<b style='color:var(--accent-tx)'>🎯 ≥"+g.lean+"</b>":"meta ≥"+g.lean+"kg","LeanBodyMass_kg")
+      /* calorias ativas: no painel quando há cut (Q7); sem painel, o KPI da Opção A */
+      +(cutC?"":(H.daily.ActiveEnergy_kcal?kpi("Calorias ativas (méd 30d)",nf(avgWin(H.daily.ActiveEnergy_kcal,30)),"kcal/dia"):kpi("Calorias ativas (méd 30d)","—","<b>ActiveEnergy_kcal</b> não veio neste export")))
       +kpi("VO2 Max",r1(latestVal(H.daily.VO2Max||{})&&latestVal(H.daily.VO2Max).v),"")
       +kpi("FC rep (30d)",r1(avgWin(H.daily.RestingHeartRate_bpm,30))+" bpm","")
       +kpi("HRV (30d)",r1(avgWin(H.daily.HRV_SDNN_ms,30))+" ms","");
@@ -2639,9 +2869,13 @@ function renderAnalise(a){
   /* ===== 4 · RESULTADO ===== */
   const g4=secao("4 · Resultado","o corpo mudou?");
   const grid=g4;                                  // os cartões do Health vivem todos aqui
-  if(!H){const av=el("div","card","<div class='empty' style='padding:24px 12px'><div class='ic'>📭</div><div>Carregue o <b>apple_health.json</b> (do vault <code>_dados/</code>) pra ver composição corporal, recuperação e o cruzamento treino×gordura. Botão no topo da página ↑</div></div>");av.classList.add("full");g4.appendChild(av);}
-  if(H){const cc=chartCard("Composição corporal","cComp","Peso e massa magra (kg) · gordura (%) · faixas de meta tracejadas");cc.classList.add("full");grid.appendChild(cc);
-    grid.appendChild(chartCard("Treino × Gordura","cTrFat","Volume mensal (barras) vs % gordura (linha) — a correlação-chave"));}
+  if(!H){const av=el("div","card","<div class='empty' style='padding:24px 12px'><div class='ic'>📭</div><div>Carregue o <b>apple_health.json</b> (do vault <code>_dados/</code>) pra ver composição corporal e recuperação. Botão no topo da página ↑</div></div>");av.classList.add("full");g4.appendChild(av);}
+  /* v1.22.0 — "Treino × Gordura" (kg·rep × %) saiu: kg·rep mede o aparelho, não o treino. A
+     composição passa a mostrar a massa gorda em kg, que é o que o cut tira, cada massa no seu eixo. */
+  if(H){const cc=(H.daily.BodyFatPercentage&&H.daily.BodyMass_kg)
+      ?chartCard("Massa gorda × massa magra (kg)","cComp","ponto = pesagem · linha = média de 28 dias · cada uma no seu eixo · meta de magra tracejada · massa gorda = peso × % do mesmo dia")
+      :chartAusente("Massa gorda × massa magra (kg)",H.daily.BodyMass_kg?"BodyFatPercentage":"BodyMass_kg");
+    cc.classList.add("full");grid.appendChild(cc);}
   if(H){
     /* P1.8 — o rótulo nomeia FONTE e FILTRO, nunca virtude. "Cardio" afirmava que o que
        estava ali era treino; contava 834 min de caminhada de deslocamento em agosto (FC
@@ -2895,6 +3129,7 @@ function buildCharts(sess,H){
   if(Chart.defaults.scales&&Chart.defaults.scales.category){Chart.defaults.scales.category.ticks=Object.assign({},Chart.defaults.scales.category.ticks,{callback:function(v){return mlabel(this.getLabelForValue(v));}});}
   const GREEN="#22c55e",BLUE="#3b82f6",WARN="#f59e0b",RED="#ef4444";
   const G=goals();
+  buildCutChart();                                  // v1.22.0: o painel do cut, quando existe
   const noBandLegend={legend:{labels:{filter:it=>!(it.text||"").startsWith("_")}},tooltip:{filter:it=>!((it.dataset.label||"").startsWith("_"))}};
   const band=(ks,lo,hi,color,axis)=>[
     {label:"_hi",data:ks.map(()=>hi),yAxisID:axis,borderColor:color,borderDash:[5,4],borderWidth:1,pointRadius:0,fill:false},
@@ -2908,22 +3143,20 @@ function buildCharts(sess,H){
 
   if(H){
     const bm=H.daily.BodyMass_kg||{},bf=bfPct(H.daily.BodyFatPercentage),lm=H.daily.LeanBodyMass_kg||{};
-    const ks=[...new Set([...Object.keys(bm),...Object.keys(lm)])].sort().filter(k=>k>="2025-01-01");
+    /* v1.22.0 — massa gorda (kg) × massa magra (kg), eixos próprios; ponto = pesagem, linha =
+       média de 28 dias (a mesma janela dos KPIs). Só dias com peso E % viram massa gorda. */
+    const mg=massaGorda(bm,bf);
+    const ks=[...new Set([...Object.keys(mg),...Object.keys(lm)])].sort().filter(k=>k>="2025-01-01");
+    const tend=m=>ks.map(k=>m[k]==null?null:(t=>t&&Math.round(t.media*100)/100)(janelaTend(m,k)));
     mk("cComp",{type:"line",data:{labels:ks,datasets:[
-      ...band(ks,G.weight[0],G.weight[1],"rgb(34,197,94)","y"),
-      ...band(ks,G.fat[0],G.fat[1],"rgb(245,158,11)","y1"),
-      line({label:"Peso (kg)",data:ks.map(k=>bm[k]??null)},GREEN,"y"),
-      line({label:"Massa magra (kg)",data:ks.map(k=>lm[k]??null)},BLUE,"y"),
-      line({label:"Gordura (%)",data:ks.map(k=>bf[k]??null)},WARN,"y1"),
+      {label:"Massa gorda (kg)",data:ks.map(k=>mg[k]==null?null:Math.round(mg[k]*100)/100),yAxisID:"y",showLine:false,pointRadius:2.5,borderColor:WARN,backgroundColor:WARN},
+      {label:"Massa gorda · média 28 d",data:tend(mg),yAxisID:"y",borderColor:WARN,backgroundColor:WARN,pointRadius:0,borderWidth:2,tension:.25,spanGaps:true},
+      {label:"Massa magra (kg)",data:ks.map(k=>lm[k]??null),yAxisID:"y1",showLine:false,pointRadius:2.5,borderColor:BLUE,backgroundColor:BLUE},
+      {label:"Massa magra · média 28 d",data:tend(lm),yAxisID:"y1",borderColor:BLUE,backgroundColor:BLUE,pointRadius:0,borderWidth:2,tension:.25,spanGaps:true},
+      {label:"_meta magra",data:ks.map(()=>G.lean),yAxisID:"y1",borderColor:BLUE,borderDash:[5,4],borderWidth:1,pointRadius:0,fill:false},
     ]},options:{maintainAspectRatio:false,interaction:{mode:"index",intersect:false},plugins:noBandLegend,scales:{
-      y:{position:"left",title:{display:true,text:"kg (meta "+G.weight[0]+"–"+G.weight[1]+")"}},y1:{position:"right",grid:{drawOnChartArea:false},title:{display:true,text:"% gordura (meta "+G.fat[0]+"–"+G.fat[1]+")"}},
+      y:{position:"left",title:{display:true,text:"massa gorda (kg)"}},y1:{position:"right",grid:{drawOnChartArea:false},title:{display:true,text:"massa magra (kg) · meta ≥"+G.lean}},
       x:{ticks:{maxTicksLimit:12}}}}});
-
-    const bfm=moAvg(bf);const months=[...new Set([...tmonths,...Object.keys(bfm)])].sort().filter(m=>m>="2025-11");
-    mk("cTrFat",{data:{labels:months,datasets:[
-      {type:"bar",label:"Volume (kg·rep)",data:months.map(m=>vol[m]||0),backgroundColor:"rgba(34,197,94,.5)",yAxisID:"y"},
-      {type:"line",label:"Gordura (%)",data:months.map(m=>bfm[m]??null),borderColor:WARN,backgroundColor:WARN,yAxisID:"y1",tension:.25,borderWidth:2,spanGaps:true},
-    ]},options:{maintainAspectRatio:false,scales:{y:{position:"left"},y1:{position:"right",grid:{drawOnChartArea:false},title:{display:true,text:"%"}}}}});
 
     mk("cRec",{type:"line",data:{labels:Object.keys(H.daily.RestingHeartRate_bpm||{}).sort().filter(k=>k>="2025-11-01"),datasets:[
       line({label:"FC repouso (bpm)",data:Object.keys(H.daily.RestingHeartRate_bpm||{}).sort().filter(k=>k>="2025-11-01").map(k=>H.daily.RestingHeartRate_bpm[k])},RED,"y"),
@@ -3445,13 +3678,20 @@ function doImport(){
    continua em showMarkdown(), como cópia pra área de transferência. */
 
 /* ============ VERSÃO ============ */
-const APP_VERSION="1.21.0";
-const APP_RELEASED="2026-10-05";
+const APP_VERSION="1.22.0";
+const APP_RELEASED="2026-10-07";
 /* Versionamento semântico MAJOR.MINOR.PATCH
    MAJOR = muda o formato dos dados (backup/restore incompatível)
    MINOR = funcionalidade nova, dados compatíveis
    PATCH = correção sem mudar comportamento                        */
 const APP_CHANGELOG=[
+ {v:"1.22.0",d:"2026-10-07",c:[
+   "Análise (desktop): painel do cut no topo, uma linha por regra do plano — média semanal de peso, pesagens nesta semana, força dos 🔑 e calorias ativas — com o estado de hoje e o que a regra manda fazer. Regra disparada vira chip âmbar; o app não muda meta nenhuma sozinho",
+   "O painel só aparece quando o arquivo do ciclo traz as regras do cut (cfg.cut). Sem dado, diz que não tem: 'sem pesagem no cut', 'semana não lida', 'sem comparação ainda'. O limiar de 'média parada' fica <A DEFINIR> até o arquivo trazer o número",
+   "Gráfico da média semanal do peso: ponto cheio com 2+ pesagens, vazado com 1 (não decide), o número de pesagens sob cada ponto e o ritmo esperado do plano tracejado",
+   "KPIs de Gordura, Massa gorda (nova) e Massa magra viram a média dos 28 dias até a última pesagem, com quantas pesagens entraram. Composição corporal vira Massa gorda × massa magra em kg, cada uma no seu eixo. Treino × Gordura (kg·rep) saiu",
+   "Carregar o apple_health.json só diz 'carregado ✓' se o arquivo foi gravado; se não foi, avisa e aponta o Diagnóstico",
+   "Backup continua {templates, sessions, cfg}: cfg.cut é opcional e as versões anteriores o guardam sem ler"]},
  {v:"1.21.0",d:"2026-10-05",c:[
    "Fim da tela de treino, entre '+ Adicionar exercício' e '✓ Finalizar treino': card 'Como foi o treino?' com Ruim · Normal · Bom (um toque; tocar de novo apaga) e '＋ Escrever comentário' (até 500 caracteres, contador a partir de 400)",
    "É opcional: Finalizar continua a um toque, sem pergunta nem lembrete. Não aparece no exercício em foco nem mexe no descanso",
