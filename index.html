@@ -148,6 +148,8 @@ body.light .tabbar{background:rgba(255,255,255,.92)}
 body.wide .wrap{max-width:1180px}
 .dashgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px}
 .dashgrid .full{grid-column:1 / -1}
+@media (max-width:899px){.dashgrid{grid-template-columns:minmax(0,1fr)}.so-desk{display:none!important}}
+@media (min-width:900px){.so-cel{display:none!important}}
 /* v1.22.0 — painel do cut (P12): uma linha por regra do plano; o chip diz o estado, nunca só a cor */
 .cut .cut-row{display:grid;grid-template-columns:230px 1fr;gap:16px;padding:12px 0;border-top:1px solid var(--border);font-size:14px}
 .cut .cut-row .rt{font-weight:650;font-size:14px;margin-bottom:5px}
@@ -829,9 +831,8 @@ let addExOpen=false;    // P4.8: painel de adicionar exercício aberto
 let wantScrollFoco=false;   // v1.18.0: tocou numa linha / incluiu um exercício → leva o foco à vista (só se ficou fora)
 let trPainel=null;          // v1.18.0: card aberto sob o cabeçalho do treino — null | "ajuda" | "mais"
 function renderTabs(){
-  const tabs=[["home","🏠","Treinar"],["hist","📈","Histórico"]];
-  if(isDesktop())tabs.push(["analise","📊","Análise"]);
-  tabs.push(["cfg","⚙️","Ajustes"]);
+  /* v1.25.0 — P7.3: a Análise é a 3ª aba também no celular (antes só ≥ 900 px) */
+  const tabs=[["home","🏠","Treinar"],["hist","📈","Histórico"],["analise","📊","Análise"],["cfg","⚙️","Ajustes"]];
   const tb=$("#tabbar");tb.innerHTML="";
   tabs.forEach(([id,ic,lb])=>{const b=el("button",(tab===id||(id==="home"&&(tab==="log"||tab==="save")))?"active":"","<span class='ic'>"+ic+"</span>"+lb);
     b.onclick=()=>go(id);tb.appendChild(b);});
@@ -839,12 +840,11 @@ function renderTabs(){
 
 /* ============ RENDER ROUTER ============ */
 function render(){renderTabs();const a=$("#app");a.innerHTML="";
-  if(tab==="analise"&&!isDesktop())tab="hist";
   /* v1.14.0 — o Histórico também entra em modo largo, mas só com o que justifica 1180px:
      desktop, com sessões, e com o histórico legível. Vazio e ilegível ficam em 640px com o
      texto que já existe — mensagem de erro esticada em 1180px não é mensagem. */
   document.body.classList.toggle("wide",
-    tab==="analise" || (tab==="hist" && isDesktop() && sessions.length>0 && !readFailed(K.sess)));
+    (tab==="analise"&&isDesktop()) || (tab==="hist" && isDesktop() && sessions.length>0 && !readFailed(K.sess)));
   if(tab==="log"&&active) renderLog(a);
   else if(tab==="home") renderHome(a);
   else if(tab==="hist") renderHist(a);
@@ -1276,6 +1276,8 @@ function saudeCard(){
   c.innerHTML="<div class='row'><h2 style='margin:0;flex:1'>Saúde</h2><span class='muted' style='font-size:13px"+(velho?";color:var(--warn-tx);font-weight:650":"")+"' data-ate='"+esc(ate)+"'>Apple Health · até "+esc(ddmm(ate))+(velho?" · há "+nAte+" dias":"")+"</span></div>"+
     "<div class='grid2' style='margin-top:10px'>"+bloco("Peso",peso[0],peso[1])+bloco("Gordura",gord[0],gord[1])+
       bloco("Exercício · semana",ex[0],ex[1])+bloco("FC repouso",fc[0],fc[1])+"</div>";
+  const ab=el("button","btn-ghost btn-sm","Abrir Análise →");ab.style.marginTop="10px";ab.onclick=()=>go("analise");   // v1.25.0
+  c.appendChild(ab);
   return c;
 }
 /* Card 🩺 Apple Health de Ajustes: o estado RELIDO do armazenamento + o resultado da última
@@ -2846,7 +2848,7 @@ function renderAnalise(a){
   const raw=load(K_HEALTH,null);
   const H=raw&&raw.daily?raw:null;
   const sessFail=readFailed(K.sess);
-  const head=el("div","row");head.innerHTML="<div style='flex:1'><h1>Análise</h1><div class='muted'>"+(sessFail?"<b style='color:var(--danger-tx)'>histórico não lido</b>":sess.length+" sessões")+" · Apple Health "+(H?"carregado ✓":"não carregado")+" · dados só neste navegador</div></div>";
+  const head=el("div","row wrap");head.innerHTML="<div style='flex:1 1 260px'><h1>Análise</h1><div class='muted'>"+(sessFail?"<b style='color:var(--danger-tx)'>histórico não lido</b>":sess.length+" sessões")+" · Apple Health "+(H?"carregado ✓":"não carregado")+" · dados só neste navegador</div></div>";
   const fi=el("input");fi.type="file";fi.accept=".json";fi.style.display="none";
   /* v1.23.0 — P7.2: a mesma porta de Ajustes (ingestHealth), que valida o schema, olha o save() e relê */
   fi.onchange=()=>lerArquivoHealth(fi.files[0]);
@@ -2856,7 +2858,9 @@ function renderAnalise(a){
   head.appendChild(th);head.appendChild(lb);head.appendChild(fi);a.appendChild(head);
   /* v1.22.0 — painel do cut no topo, só com cfg.cut; antes do "sem histórico" de propósito:
      histórico ilegível não esconde as linhas de peso, só a dos 🔑 diz que não leu */
-  const cutC=cardCut(H,sessFail);if(cutC)a.appendChild(cutC);
+  const cutC=cardCut(H,sessFail);if(cutC){cutC.classList.add("so-desk");a.appendChild(cutC);
+    /* Q9 do quadro R da P12: o painel do cut não vai ao celular agora — escondido e DITO */
+    const av=el("div","muted so-cel","Painel do cut ("+esc(cfg.ciclo||"ciclo")+"): só no desktop, com a tela ≥ 900 px.");av.style.margin="0 0 12px";av.dataset.cutCel="1";a.appendChild(av);}
 
   if(!sess.length){if(cutPlot)ensureChart(buildCutChart);a.appendChild(el("div","empty",sessFail
     ?"<div class='ic'>⚠️</div><div>O histórico não pôde ser lido — <b>"+esc(sessFail)+"</b>.<br>Nada foi apagado, e a cópia bruta está preservada. Ver <b>Ajustes → Diagnóstico de dados</b> <u>antes</u> de importar por cima.</div>"
@@ -3155,7 +3159,10 @@ function cardTetoCarga(sess){
      abaixo+" est"+(abaixo===1?"á":"ão")+" abaixo dele"+
      (unicos?" · "+unicos+(unicos===1?" exercício ficou de fora por ter uma sessão só":" exercícios ficaram de fora por terem uma sessão só")+" — não há distância a medir":"")+
      "<br>barra = última carga · traço = maior carga já registrada · empate conta como <b>no teto</b></div>";
-  h+="<table style='width:100%;border-collapse:collapse;font-size:14px'>";
+  /* v1.25.0 — 5 colunas sem quebra não cabem em 390 px: no celular a tabela some e a linha diz
+     onde ela está (spec P7.3: esconder e declarar, nunca espremer). O resumo acima continua. */
+  h+="<div class='muted so-cel' data-so-desk='teto' style='font-size:12px'>a tabela por exercício só cabe no desktop (tela ≥ 900 px)</div>";
+  h+="<table class='so-desk' style='width:100%;border-collapse:collapse;font-size:14px'>";
   medidos.forEach(n=>{
     const o=m[n],pct=Math.max(4,Math.round(100*o.ultima/o.teto));
     const ok=o.ultima>=o.teto;
@@ -3785,13 +3792,18 @@ function doImport(){
    continua em showMarkdown(), como cópia pra área de transferência. */
 
 /* ============ VERSÃO ============ */
-const APP_VERSION="1.24.0";
+const APP_VERSION="1.25.0";
 const APP_RELEASED="2026-10-07";
 /* Versionamento semântico MAJOR.MINOR.PATCH
    MAJOR = muda o formato dos dados (backup/restore incompatível)
    MINOR = funcionalidade nova, dados compatíveis
    PATCH = correção sem mudar comportamento                        */
 const APP_CHANGELOG=[
+ {v:"1.25.0",d:"2026-10-07",c:[
+   "📊 Análise virou a 3ª aba também no celular (Treinar · Histórico · Análise · Ajustes). Os cartões ficam numa coluna e os KPIs em duas",
+   "O painel do cut continua só no desktop; no celular, uma linha diz que ele existe lá",
+   "Card Saúde da Home ganhou 'Abrir Análise →'",
+   "Sem internet, os gráficos não carregam e o aviso aparece; os números do topo continuam"]},
  {v:"1.24.0",d:"2026-10-07",c:[
    "Ajustes em quatro grupos — Treino, Durante o treino, Dados e saúde, Sobre. Cada linha diz o estado à direita (ciclo e plano, meta, letras, playlist configurada ou não, alarme, Apple Health até DD/MM, treinos e séries) e abre o que já existia logo abaixo, uma por vez",
    "Backup pro vault fica sempre aberto no topo de Dados e saúde, com a idade do último backup (laranja a partir de 10 dias) e o aviso numa linha só",
