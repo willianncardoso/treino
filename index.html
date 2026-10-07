@@ -203,6 +203,28 @@ body.wide .histchart{position:sticky;top:18px}
 .hchip.on{background:var(--accent);border-color:var(--accent);color:#0b0f14;font-weight:650}
 select.hchip.todos{width:auto;color:#60a5fa}
 body.light select.hchip.todos{color:#1d4ed8}
+.hm-desk{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(0,1fr);gap:20px;align-items:start}
+.hm-desk .hm-col>.card{margin-bottom:14px}
+.hm-desk-topo .hm-cta{width:auto;min-width:220px;margin:0 0 0 auto}
+.hm-lista{list-style:none;counter-reset:n;margin:12px 0 0;padding:6px 14px;background:var(--surface2);border-radius:10px}
+.hm-lista li{counter-increment:n;display:flex;justify-content:space-between;gap:10px;padding:7px 0}
+.hm-lista li::before{content:counter(n);color:var(--muted);font-size:12px;width:16px;flex:0 0 auto;padding-top:2px}
+.hm-lista li .nm{flex:1;min-width:0}
+.hm-desk .hm-tiles{grid-template-columns:repeat(3,minmax(0,1fr))}
+.hm-tdesk{margin:0;display:flex;flex-direction:column}
+.hm-tdesk .big{font-size:30px;font-weight:800;color:var(--accent-tx);line-height:1}
+.hm-tdesk button{margin-top:auto!important}
+.menu-topo{display:none}
+@media (min-width:900px){
+  body{padding-left:220px;padding-bottom:24px}
+  .tabbar{top:0;bottom:0;right:auto;width:220px;flex-direction:column;justify-content:flex-start;gap:4px;padding:24px 16px;border-top:0;border-right:1px solid var(--border)}
+  .tabbar button{flex:0 0 auto;flex-direction:row;justify-content:flex-start;gap:10px;font-size:15px;padding:10px 12px;border-radius:10px;color:var(--muted)}
+  .tabbar button .ic{font-size:16px}
+  .tabbar button.active{background:var(--surface2)}
+  .tabbar .menu-topo{display:block;padding:0 4px 18px}
+  .sessionbar{left:220px;bottom:12px}
+  .toast{left:calc(50% + 110px);bottom:40px}
+}
 .hm-semana{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;margin:12px 0 10px}
 .hm-semana .lb{font-size:11px;color:var(--muted);margin-bottom:5px}
 .hm-dia{width:36px;height:36px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;background:var(--surface2);font-weight:700;font-size:13px;color:var(--muted)}
@@ -825,6 +847,10 @@ function keepFieldVisible(i){
 
 /* ============ NAV ============ */
 function isDesktop(){return window.matchMedia("(min-width: 900px)").matches;}
+/* v1.27.0 — cruzar os 900 px (girar o iPad, redimensionar a janela) redesenha a tela: menu lateral
+   ↔ tabbar e Home em duas colunas ↔ uma, sem recarregar. Na tela de treino não redesenha: um
+   render no meio de uma série recriaria os campos (e o teclado) embaixo do polegar. */
+try{window.matchMedia("(min-width: 900px)").addEventListener("change",()=>{if(tab!=="log")render();else renderTabs();});}catch(e){}
 /* P5.12 — sair da tela de confirmação pela tabbar deixava `pendingSave` pendurado até o
    reload. Não corrompe nada (o treino já está gravado e conferido), mas é estado morto:
    quem não vai pra "save" não tem confirmação pendente. */
@@ -839,6 +865,8 @@ function renderTabs(){
   /* v1.25.0 — P7.3: a Análise é a 3ª aba também no celular (antes só ≥ 900 px) */
   const tabs=[["home","🏠","Treinar"],["hist","📈","Histórico"],["analise","📊","Análise"],["cfg","⚙️","Ajustes"]];
   const tb=$("#tabbar");tb.innerHTML="";
+  /* v1.27.0 — P7.4: no desktop a tabbar vira menu lateral (CSS); o topo do menu só aparece lá */
+  tb.appendChild(el("div","menu-topo","<div style='font-weight:750;font-size:20px'>Treino</div><div class='muted' style='font-size:12px'>Ciclo "+esc(cfg.ciclo||"—")+" · Plano "+esc(cfg.plano||"—")+"</div>"));
   tabs.forEach(([id,ic,lb])=>{const b=el("button",(tab===id||(id==="home"&&(tab==="log"||tab==="save")))?"active":"","<span class='ic'>"+ic+"</span>"+lb);
     b.onclick=()=>go(id);tb.appendChild(b);});
 }
@@ -849,7 +877,7 @@ function render(){renderTabs();const a=$("#app");a.innerHTML="";
      desktop, com sessões, e com o histórico legível. Vazio e ilegível ficam em 640px com o
      texto que já existe — mensagem de erro esticada em 1180px não é mensagem. */
   document.body.classList.toggle("wide",
-    (tab==="analise"&&isDesktop()) || (tab==="hist" && isDesktop() && sessions.length>0 && !readFailed(K.sess)));
+    (tab==="analise"&&isDesktop()) || (tab==="home"&&isDesktop()) || (tab==="hist" && isDesktop() && sessions.length>0 && !readFailed(K.sess)));
   if(tab==="log"&&active) renderLog(a);
   else if(tab==="home") renderHome(a);
   else if(tab==="hist") renderHist(a);
@@ -942,6 +970,11 @@ function renderHome(a){
     "<h1 style='margin:2px 0 0;font-size:26px'>Treino</h1></div>"+
     "<span class='pill' style='margin-top:4px'>"+esc(cfg.ciclo)+" · "+esc(cfg.plano)+"</span>";
   a.appendChild(h);
+  /* v1.27.0 — P7.4: no desktop (≥ 900 px) duas colunas — à esquerda o herói largo (lista inteira)
+     e Outros treinos em cards com botão; à direita Semana, Saúde e Recentes (4). L e R são `a`
+     no celular, então o fluxo de 390 px não muda. */
+  const desk=isDesktop();let L=a,R=a;
+  if(desk){const gr=el("div","hm-desk");L=el("div","hm-col");R=el("div","hm-col");gr.appendChild(L);gr.appendChild(R);a.appendChild(gr);}
 
   const actFail=readFailed(K.active), falhou=readFailed(K.sess);
   const ordem=ordemTreinos(falhou);
@@ -954,7 +987,7 @@ function renderHome(a){
       "<div class='muted' style='margin-top:4px'>"+esc(actFail)+". Nada foi apagado.</div>";
     const b=el("button","btn-ghost","Ver Ajustes → Diagnóstico de dados");b.style.width="100%";b.style.marginTop="10px";
     b.onclick=()=>go("cfg");
-    c.appendChild(b);a.appendChild(c);
+    c.appendChild(b);L.appendChild(c);
   }else if(modo==="orfa"){
     /* P1.10 — `Continuar treino →` some: continuar é o que ele não vai fazer num treino de dias
        atrás. finishSession() já descarta série em branco e exercício sem série, e
@@ -970,11 +1003,11 @@ function renderHome(a){
     const d=el("button","btn-danger","Descartar");d.style.width="100%";d.style.marginTop="8px";
     d.onclick=()=>{if(confirm("Descartar este treino? Os dados não serão salvos."))
       {descartarAtiva();go("home");}};   // v1.18.0: grava `discard` no iolog, como o ⋯ do treino
-    c.appendChild(f);c.appendChild(d);a.appendChild(c);
+    c.appendChild(f);c.appendChild(d);L.appendChild(c);
   }else if(modo==="treino"){
-    a.appendChild(heroiEmTreino());
+    L.appendChild(heroiEmTreino());
   }else if(modo==="ocioso"&&ordem.length){
-    a.appendChild(heroiOcioso(ordem[0]));
+    L.appendChild(desk?heroiDesk(ordem[0]):heroiOcioso(ordem[0]));
   }
 
   /* Outros treinos. Em treino, some: tocar num tile só levaria ao confirm de descartar.
@@ -982,37 +1015,37 @@ function renderHome(a){
      histórico ilegível) a escolha não diz nada sobre a regra do "mais parado". */
   if(modo!=="treino"){
     const tiles=modo==="ocioso"?ordem.slice(1):ordem;
-    if(falhou)a.appendChild(el("div","muted","histórico não pôde ser lido — ordem do template · ver Ajustes → Diagnóstico de dados"));
-    if(!ordem.length)a.appendChild(el("div","empty","<div>Nenhum treino cadastrado · ver Ajustes → Editar treinos</div>"));
+    if(falhou)L.appendChild(el("div","muted","histórico não pôde ser lido — ordem do template · ver Ajustes → Diagnóstico de dados"));
+    if(!ordem.length)L.appendChild(el("div","empty","<div>Nenhum treino cadastrado · ver Ajustes → Editar treinos</div>"));
     /* v1.17.0 — o avulso vem sempre por último e na linha inteira: com 3 colunas e 3 letras
        no ocioso, ele nunca fica órfão no meio de uma linha. */
     const avulsos=Object.keys(templates).filter(isAvulsoTpl).sort();
     if(tiles.length||avulsos.length){
-      a.appendChild(el("div","muted",modo==="ocioso"?"Outros treinos":"Escolher treino")).style.margin="4px 0 8px";
+      L.appendChild(el("div","muted",modo==="ocioso"?"Outros treinos":"Escolher treino")).style.margin="4px 0 8px";
       const g=el("div","daygrid hm-tiles");
-      tiles.forEach(d=>g.appendChild(tileTreino(d,falhou,modo==="ocioso"?"outro":null)));
+      tiles.forEach(d=>g.appendChild((desk?tileDesk:tileTreino)(d,falhou,modo==="ocioso"?"outro":null)));
       /* v1.20.0 — com 4 tiles (C5: 5 letras − herói) sobra uma letra sozinha na última linha:
          o E (um só) ocupa as 2 colunas ao lado dela em vez de deixar um buraco. Com 3 ou 6
          tiles (ou 2/5, onde sobraria 1 coluna), linha inteira, como antes. */
       const meia=avulsos.length===1&&tiles.length%3===1;
       avulsos.forEach(d=>g.appendChild(tileAvulso(d,falhou,meia)));
-      a.appendChild(g);
+      L.appendChild(g);
     }
   }
 
-  a.appendChild(semanaCard());
-  a.appendChild(saudeCard());                       // v1.23.0 — P7.2
+  R.appendChild(semanaCard());
+  R.appendChild(saudeCard());                       // v1.23.0 — P7.2
 
   if(sessions.length&&!falhou){
     const hd=el("div","row");hd.style.margin="4px 0 8px";
     hd.appendChild(el("h3",null,"Recentes")).style.cssText="flex:1;margin:0";
     const vh=el("button","btn-ghost btn-sm","Ver histórico →");vh.onclick=()=>go("hist");
-    hd.appendChild(vh);a.appendChild(hd);
+    hd.appendChild(vh);R.appendChild(hd);
     /* 3, não 5: a Home é a porta da academia, não o Histórico. O 📋 Markdown saiu daqui e
        continua na confirmação ao finalizar (errata v1.21.0: não existe "detalhe da sessão" no
        Histórico — ele é por exercício e nenhuma linha de sessão abre nada). */
     const c=el("div","card");c.style.padding="4px 16px";
-    sessions.slice(-3).reverse().forEach(s=>{
+    sessions.slice(desk?-4:-3).reverse().forEach(s=>{   // v1.27.0: 4 no desktop
       const r=el("div","sess");
       const dt=durTxt(s);
       r.innerHTML="<div class='row' style='min-width:0'><span class='dot'>"+esc(s.day)+"</span><div style='min-width:0'>"+
@@ -1022,7 +1055,7 @@ function renderHome(a){
         Math.round(sessVol(s)).toLocaleString("pt-BR")+" kg·rep</div>";
       c.appendChild(r);
     });
-    a.appendChild(c);
+    R.appendChild(c);
   }
 }
 function heroiOcioso(d){
@@ -1049,6 +1082,41 @@ function heroiOcioso(d){
   const b=el("button","btn-primary hm-cta","Começar treino "+esc(d));
   b.onclick=()=>startSession(d,"heroi");
   c.appendChild(b);
+  return c;
+}
+/* v1.27.0 — herói largo do desktop: a lista INTEIRA, na ordem em que a sessão vai abrir
+   (orderLikeLast, nunca t.ex cru — o Figma numera na ordem do template e está errado nisso), e
+   `N exercícios · S séries` (S = soma do número antes do × em cada sr; se algum sr não tiver,
+   o total é omitido: soma parcial seria número falso). */
+function seriesTotal(exs){let t=0;for(const e of exs){const n=targetSets(e);if(!n)return null;t+=n;}return t;}
+function heroiDesk(d){
+  const c=heroiOcioso(d);
+  const t=templates[d]||{name:d,ex:[]},exs=orderLikeLast(d,semOpc(t.ex)),S=seriesTotal(exs);
+  c.querySelectorAll(".hm-ex").forEach(x=>x.remove());
+  const mais=[...c.children].find(x=>x.classList&&x.classList.contains("muted")&&/^\+ /.test(x.textContent));if(mais)mais.remove();
+  if(S!=null){const sub=c.querySelector(".hm-letra+div .muted:last-child");if(sub)sub.textContent=sub.textContent.replace(/(\d+ exerc[ií]cios?)/,"$1 · "+S+" séries");}
+  const b=c.querySelector(".hm-cta");
+  const topo=c.children[1];topo.classList.add("hm-desk-topo");if(b){b.remove();topo.appendChild(b);}
+  const lista=el("ol","hm-lista");
+  exs.forEach(e=>{const li=el("li",null,"<span class='nm'>"+esc(trimNome(e.n))+"</span><span class='muted'>"+esc(e.sr||"")+"</span>");lista.appendChild(li);});
+  if(!exs.length)lista.appendChild(el("li","muted","nenhum exercício no treino"));
+  c.appendChild(lista);
+  return c;
+}
+/* card de Outros treinos no desktop: letra, idade, nome, 3 exercícios e o botão Começar X */
+function tileDesk(d,falhou,origem){
+  const t=templates[d],exs=orderLikeLast(d,semOpc(t.ex));
+  const bloq=!falhou&&condicionalBloqueada(d);
+  const n=falhou?null:diasDe(d);
+  const idade=falhou?"histórico não lido":idadeTxt(n);
+  const alerta=!falhou&&!bloq&&n!==null&&n>diasAlerta();
+  const c=el("div","card hm-tdesk");c.dataset.tile=d;
+  c.innerHTML="<div class='row' style='align-items:baseline'><div class='big' style='flex:1'>"+esc(d)+"</div><span class='muted' style='font-size:13px"+(alerta?";color:var(--warn-tx);font-weight:650":"")+"'>"+esc(idade)+"</span></div>"+
+    "<div style='font-weight:650;margin:2px 0 4px'>"+esc(t.name)+(bloq?" · depois de "+esc(faixaLetras(letrasBase())):"")+"</div>"+
+    exs.slice(0,3).map(e=>"<div class='muted' style='font-size:13px'>"+esc(trimNome(e.n))+"</div>").join("")+
+    (exs.length>3?"<div class='muted' style='font-size:13px'>+ "+(exs.length-3)+(exs.length-3===1?" exercício":" exercícios")+"</div>":"");
+  const b=el("button","btn-ghost","Começar "+esc(d));b.style.cssText="width:100%;margin-top:10px";
+  b.onclick=()=>startSession(d,origem);c.appendChild(b);
   return c;
 }
 function tileTreino(d,falhou,origem){
@@ -3841,13 +3909,17 @@ function doImport(){
    continua em showMarkdown(), como cópia pra área de transferência. */
 
 /* ============ VERSÃO ============ */
-const APP_VERSION="1.26.0";
+const APP_VERSION="1.27.0";
 const APP_RELEASED="2026-10-07";
 /* Versionamento semântico MAJOR.MINOR.PATCH
    MAJOR = muda o formato dos dados (backup/restore incompatível)
    MINOR = funcionalidade nova, dados compatíveis
    PATCH = correção sem mudar comportamento                        */
 const APP_CHANGELOG=[
+ {v:"1.27.0",d:"2026-10-07",c:[
+   "Desktop (tela ≥ 900 px): a barra de abas vira menu lateral fixo, com o ciclo e o plano no topo; a aba de treino continua marcando Treinar",
+   "Home do desktop em duas colunas: à esquerda o próximo treino com a lista inteira de exercícios (na ordem em que a sessão abre) e o total de séries, e os outros treinos em cards com 'Começar X'; à direita Esta semana, Saúde e os 4 treinos recentes",
+   "Ao cruzar os 900 px (redimensionar a janela) a tela se refaz sem recarregar. No celular nada muda"]},
  {v:"1.26.0",d:"2026-10-07",c:[
    "Histórico: total de treinos e séries no topo; atalhos (chips) para os 5 exercícios mais feitos com carga nos últimos 90 dias, com o escolhido sempre em 1º, e 'Todos os exercícios ▾' para os demais",
    "Número grande da métrica com '= manteve 42 kg · 15 sessões (desde 08/04)' quando a carga máxima não muda; período 3 meses · 6 meses · Tudo (fica gravado)",
