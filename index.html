@@ -182,6 +182,10 @@ body.wide .histchart{position:sticky;top:18px}
 .hm-tile .big{font-size:28px;line-height:1.1}
 .hm-barra{height:8px;border-radius:4px;background:var(--surface2);overflow:hidden;margin:12px 0 6px}
 .hm-barra i{display:block;height:100%;background:var(--accent)}
+.hm-saude .bx{background:var(--surface2);border-radius:10px;padding:10px 12px;min-width:0}
+.hm-saude .bx .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.hm-saude .bx .v{font-size:21px;font-weight:750;margin:2px 0 1px}
+.hm-saude .bx .d{font-size:12px;color:var(--muted)}
 .hm-semana{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;margin:12px 0 10px}
 .hm-semana .lb{font-size:11px;color:var(--muted);margin-bottom:5px}
 .hm-dia{width:36px;height:36px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;background:var(--surface2);font-weight:700;font-size:13px;color:var(--muted)}
@@ -982,6 +986,7 @@ function renderHome(a){
   }
 
   a.appendChild(semanaCard());
+  a.appendChild(saudeCard());                       // v1.23.0 — P7.2
 
   if(sessions.length&&!falhou){
     const hd=el("div","row");hd.style.margin="4px 0 8px";
@@ -1186,6 +1191,113 @@ function semanaCard(){
   return c;
 }
 function sessVol(s){return s.exercises.reduce((a,e)=>a+setVol(e.sets),0);}
+
+/* ---------- v1.23.0 — P7.2 · Saúde ----------
+   Porta única de entrada do dado de saúde: ingestHealth(payload, origem). Valida, grava OLHANDO
+   o save(), grava um recibo à parte e RELÊ — a confirmação sai da releitura, nunca de um toast.
+   O recibo é K_HEALTH_META: {carregadoEm, origem, schema, dadosAte, metricas, bytes}; dadosAte é
+   a maior data de QUALQUER métrica (o fim do export), não a última pesagem.
+   origem "arquivo" substitui; "atalho" (futuro, ainda sem chamador) mescla por métrica e dia e
+   nunca apaga dia que não veio. Saúde NÃO entra no backup ({templates,sessions,cfg} não muda). */
+const K_HEALTH_META="gymlog_health_meta_v1";
+let healthUltimo=null;          // resultado da última tentativa NESTA visita: {ok, motivo, t}
+function healthDadosAte(d){return fimExport(d);}
+function ingestHealth(payload,origem){
+  const r=(ok,motivo,extra)=>(healthUltimo=Object.assign({ok:ok,motivo:motivo,t:Date.now()},extra||{}));
+  if(!payload||typeof payload!=="object"||Array.isArray(payload))return r(false,"o arquivo não é um objeto JSON");
+  if(payload.schema!=="apple_health/v2")return r(false,"schema encontrado: "+(payload.schema==null?"nenhum":String(payload.schema))+" (esperado apple_health/v2)");
+  if(!payload.daily||typeof payload.daily!=="object"||Array.isArray(payload.daily))return r(false,"o arquivo não tem 'daily'");
+  let dado=payload;
+  if(origem==="atalho"){
+    const ant=load(K_HEALTH,null);
+    if(ant&&ant.daily){dado=JSON.parse(JSON.stringify(ant));dado.schema=payload.schema;
+      for(const m in payload.daily){dado.daily[m]=Object.assign({},dado.daily[m]||{},payload.daily[m]);}}
+  }
+  const antes=ioLogRead().length;
+  if(!save(K_HEALTH,dado)){
+    const ult=ioLogRead().slice(antes).filter(x=>x.key===K_HEALTH).pop();
+    const porque=ult&&ult.kind==="write-fail"?"não gravado: sem espaço no navegador":ult&&ult.kind==="verify-fail"?"não gravado: a releitura não bateu com o arquivo":"não gravado";
+    const ainda=load(K_HEALTH,null);
+    return r(false,porque,{anterior:ainda&&ainda.daily?healthDadosAte(ainda):null});
+  }
+  const meta={carregadoEm:Date.now(),origem:origem,schema:dado.schema,dadosAte:healthDadosAte(dado),
+    metricas:Object.keys(dado.daily).length,bytes:JSON.stringify(dado).length};
+  const metaOk=save(K_HEALTH_META,meta);
+  const back=load(K_HEALTH,null);
+  if(!back||!back.daily||healthDadosAte(back)!==meta.dadosAte)return r(false,"gravado, mas a releitura não confere — ver Diagnóstico");
+  return r(true,metaOk?null:"o dado foi gravado, o recibo não (sem data de carregamento)");
+}
+/* Estado lido do armazenamento, para a Home e Ajustes. Nunca inventa: ilegível, vazio, ou o dado. */
+function healthEstado(){
+  const H=load(K_HEALTH,null),f=readFailed(K_HEALTH);
+  if(f)return {modo:"erro",motivo:f};
+  if(!H||!H.daily)return {modo:"vazio"};
+  const meta=load(K_HEALTH_META,null);
+  return {modo:"ok",H:H,meta:(meta&&typeof meta==="object")?meta:null,ate:(meta&&meta.dadosAte)||healthDadosAte(H)};
+}
+function quandoTxt(ds){const n=daysSince(ds);return n===0?"hoje":n===1?"ontem":ddmm(ds);}
+const SEMABR=["seg","ter","qua","qui","sex","sáb","dom"];
+function saudeCard(){
+  const c=el("div","card hm-saude");c.dataset.saude="1";
+  const E=healthEstado();
+  if(E.modo==="erro"){c.innerHTML="<h2 style='margin:0'>Saúde</h2><div style='font-weight:600;margin-top:8px;color:var(--danger-tx)'>dados de saúde não puderam ser lidos</div>"+
+    "<div class='muted' style='margin-top:2px'>ver Ajustes → Diagnóstico de dados · "+esc(E.motivo)+"</div>";return c;}
+  if(E.modo==="vazio"){c.innerHTML="<div class='row'><div style='flex:1'><b>Saúde</b> <span class='muted'>· Sem dados de saúde neste aparelho</span></div></div>";
+    const b=el("button","btn-ghost btn-sm","Carregar em Ajustes →");b.onclick=()=>go("cfg");c.firstChild.appendChild(b);return c;}
+  const H=E.H,D=H.daily,ate=E.ate,velho=daysSince(ate)>7;
+  const bloco=(k,v,d,data)=>"<div class='bx' data-bloco='"+esc(k)+"'><div class='k'>"+esc(k)+"</div>"+(v==null?"<div class='d' style='margin-top:6px'>"+d+"</div>":"<div class='v'>"+v+"</div><div class='d'>"+d+"</div>")+"</div>";
+  const ult=(m,fmt,nome)=>{if(!D[m])return [null,"não veio no arquivo · "+nome];const l=latestVal(D[m]);return l?[fmt(l.v),esc(quandoTxt(l.d))]:[null,"sem leitura · "+nome];};
+  const peso=ult("BodyMass_kg",v=>nf(v,1)+" kg","peso");
+  const gord=D.BodyFatPercentage?(l=>l?[nf(l.v,1)+" %",esc(quandoTxt(l.d))]:[null,"sem leitura · gordura"])(latestVal(bfPct(D.BodyFatPercentage))):[null,"não veio no arquivo · gordura"];
+  const fc=ult("RestingHeartRate_bpm",v=>Math.round(v)+" bpm","FC repouso");
+  // Exercício · semana: seg até min(domingo, dadosAte, hoje)
+  let ex;
+  if(!D.ExerciseMinutes)ex=[null,"não veio no arquivo · exercício"];
+  else{const [ini,fim]=weekRange(),hoje=today();let lim=fim<ate?fim:ate;if(hoje<lim)lim=hoje;
+    const dias=[];for(let d=ini;d<=lim;d=maisDias(d,1))dias.push(d);
+    const tem=dias.filter(d=>D.ExerciseMinutes[d]!=null);
+    if(!tem.length){const u=latestVal(D.ExerciseMinutes);ex=[null,"sem dado desta semana"+(u?" · último "+esc(ddmm(u.d)):"")];}
+    else{const soma=tem.reduce((a,d)=>a+D.ExerciseMinutes[d],0),i0=0,i1=dias.length-1;
+      const rot=SEMABR[i0]+(i1>i0?"–"+SEMABR[i1]:"");
+      const hj=D.ExerciseMinutes[hoje]!=null?"hoje "+Math.round(D.ExerciseMinutes[hoje]):"hoje: sem dado";
+      const falt=dias.length-tem.length;
+      ex=[Math.round(soma)+" min",esc(hj+" · "+rot+(falt?" · "+falt+(falt===1?" dia sem dado":" dias sem dado"):""))];}}
+  const nAte=daysSince(ate);
+  c.innerHTML="<div class='row'><h2 style='margin:0;flex:1'>Saúde</h2><span class='muted' style='font-size:13px"+(velho?";color:var(--warn-tx);font-weight:650":"")+"' data-ate='"+esc(ate)+"'>Apple Health · até "+esc(ddmm(ate))+(velho?" · há "+nAte+" dias":"")+"</span></div>"+
+    "<div class='grid2' style='margin-top:10px'>"+bloco("Peso",peso[0],peso[1])+bloco("Gordura",gord[0],gord[1])+
+      bloco("Exercício · semana",ex[0],ex[1])+bloco("FC repouso",fc[0],fc[1])+"</div>";
+  return c;
+}
+/* Card 🩺 Apple Health de Ajustes: o estado RELIDO do armazenamento + o resultado da última
+   tentativa. "carregado" só aparece se a releitura trouxe o dado. */
+function healthCfgCard(){
+  const c=el("div","card");c.dataset.health="1";
+  c.appendChild(el("h3",null,"🩺 Apple Health"));
+  const E=healthEstado();
+  let st;
+  if(E.modo==="erro")st="<b style='color:var(--danger-tx)'>leitura falhou</b> · "+esc(E.motivo)+" · ver Diagnóstico de dados abaixo";
+  else if(E.modo==="vazio")st="não carregado neste aparelho";
+  else{const m=E.meta,l=latestVal(E.H.daily.BodyMass_kg||{});
+    st=(m&&m.carregadoEm?"carregado em "+esc(ddmm(new Date(m.carregadoEm).toISOString().slice(0,10)))+" · ":"carregado (sem recibo: veio de uma versão anterior) · ")+
+      Object.keys(E.H.daily).length+" métricas · dados até <b>"+esc(ddmm(E.ate))+"</b>"+(l?" · peso de "+esc(ddmm(l.d)):" · sem peso");}
+  const est=el("div","muted",st);est.dataset.estado="1";c.appendChild(est);
+  if(healthUltimo&&!healthUltimo.ok){const e=el("div");e.style.cssText="margin-top:8px;color:var(--danger-tx);font-weight:650";e.dataset.falha="1";
+    e.textContent="✗ "+healthUltimo.motivo+(healthUltimo.anterior?" — o carregado antes continua (dados até "+ddmm(healthUltimo.anterior)+")":"");c.appendChild(e);}
+  else if(healthUltimo&&healthUltimo.ok&&healthUltimo.motivo){const e=el("div");e.style.cssText="margin-top:8px;color:var(--warn-tx)";e.textContent=healthUltimo.motivo;c.appendChild(e);}
+  c.appendChild(el("div","muted","Vem de <code>_dados/apple_health.json</code> no vault (no iPhone, pelo iCloud Drive). Não entra no backup."));
+  const fi=el("input");fi.type="file";fi.accept=".json,application/json";fi.style.display="none";
+  fi.onchange=()=>lerArquivoHealth(fi.files[0]);
+  const b=el("button","btn-ghost btn-sm","⬆ Carregar apple_health.json");b.style.marginTop="8px";b.onclick=()=>fi.click();
+  c.appendChild(b);c.appendChild(fi);
+  return c;
+}
+function lerArquivoHealth(f){if(!f)return;const rd=new FileReader();
+  rd.onload=()=>{let d;try{d=JSON.parse(rd.result);}catch(e){healthUltimo={ok:false,motivo:"o arquivo não é JSON",t:Date.now()};render();return;}
+    const r=ingestHealth(d,"arquivo");
+    if(!r.ok&&tab==="analise")alert("O apple_health.json NÃO foi carregado: "+r.motivo+".\nVer Ajustes → Apple Health e Diagnóstico de dados.");
+    render();};
+  rd.onerror=()=>{healthUltimo={ok:false,motivo:"o navegador não conseguiu ler o arquivo",t:Date.now()};render();};
+  rd.readAsText(f);}
 
 /* ---------- START / LOG ---------- */
 /* ---------- ORDEM DE EXECUÇÃO ---------- */
@@ -2728,11 +2840,8 @@ function renderAnalise(a){
   const sessFail=readFailed(K.sess);
   const head=el("div","row");head.innerHTML="<div style='flex:1'><h1>Análise</h1><div class='muted'>"+(sessFail?"<b style='color:var(--danger-tx)'>histórico não lido</b>":sess.length+" sessões")+" · Apple Health "+(H?"carregado ✓":"não carregado")+" · dados só neste navegador</div></div>";
   const fi=el("input");fi.type="file";fi.accept=".json";fi.style.display="none";
-  fi.onchange=()=>{const f=fi.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);
-    /* v1.22.0 — o ✓ saía sem olhar o save(): sem espaço, a tela dizia "carregado" e nada ficava gravado. */
-    if(d.daily){if(save(K_HEALTH,d)){toast("Apple Health carregado ✓");render();}
-      else alert("O apple_health.json NÃO foi gravado neste navegador (falhou ao salvar).\nVer Ajustes → Diagnóstico de dados.");}
-    else toast("Carregue o apple_health.json");}catch(e){toast("JSON inválido");}};rd.readAsText(f);};
+  /* v1.23.0 — P7.2: a mesma porta de Ajustes (ingestHealth), que valida o schema, olha o save() e relê */
+  fi.onchange=()=>lerArquivoHealth(fi.files[0]);
   const lb=el("button","btn-ghost btn-sm",H?"🔄 Trocar Apple Health":"⬆ Carregar Apple Health");lb.onclick=()=>fi.click();
   const th=el("button","btn-ghost btn-sm",cfg.theme==="light"?"🌙 Escuro":"☀️ Claro");
   th.onclick=()=>{cfg.theme=(cfg.theme==="light")?"dark":"light";save(K.cfg,cfg);applyTheme();render();};
@@ -3379,6 +3488,8 @@ function renderCfg(a){
   c3.appendChild(rst);
   a.appendChild(c3);
 
+  a.appendChild(healthCfgCard());                   // v1.23.0 — P7.2
+
   // análise / Apple Health
   const c4=el("div","card");
   c4.appendChild(el("h3",null,"📊 Análise (desktop / Apple Health)"));
@@ -3391,7 +3502,7 @@ function renderCfg(a){
   c4.appendChild(el("div","muted","O <b>treinos.json</b> (schema canônico, horário de cada série em ISO) "+
     "não sai mais do celular: ele é regenerado no Mac pelo <code>recolher_treino.py</code> a partir do "+
     "<b>⬇ Backup pro vault</b> acima. Um arquivo pra exportar, um lugar pra salvar.<br>"+
-    "O <b>Apple Health</b> se carrega na aba <b>📊 Análise</b>, que aparece no desktop (tela ≥900px)."));
+    "A aba <b>📊 Análise</b> aparece no desktop (tela ≥900px)."));
   a.appendChild(c4);
 
   // ---- diagnóstico de dados ----
@@ -3678,13 +3789,19 @@ function doImport(){
    continua em showMarkdown(), como cópia pra área de transferência. */
 
 /* ============ VERSÃO ============ */
-const APP_VERSION="1.22.0";
+const APP_VERSION="1.23.0";
 const APP_RELEASED="2026-10-07";
 /* Versionamento semântico MAJOR.MINOR.PATCH
    MAJOR = muda o formato dos dados (backup/restore incompatível)
    MINOR = funcionalidade nova, dados compatíveis
    PATCH = correção sem mudar comportamento                        */
 const APP_CHANGELOG=[
+ {v:"1.23.0",d:"2026-10-07",c:[
+   "Home: card Saúde abaixo de Esta semana, com Peso, Gordura, Exercício da semana e FC de repouso, cada um com a própria data. Cabeçalho 'Apple Health · até DD/MM', em laranja com 'há N dias' quando o arquivo tem mais de 7 dias",
+   "Sem dado: 'Sem dados de saúde neste aparelho · Carregar em Ajustes →'. Métrica que não veio no arquivo diz que não veio; nada vira zero ou traço",
+   "Ajustes: card 🩺 Apple Health com o estado relido do aparelho ('carregado em DD/MM · 13 métricas · dados até DD/MM · peso de DD/MM') e o botão ⬆ Carregar apple_health.json. Agora dá para carregar no iPhone",
+   "Uma porta só para gravar saúde (Ajustes e Análise): recusa arquivo de outro schema dizendo qual veio, diz 'não gravado: sem espaço no navegador' quando não cabe, e o que estava antes continua",
+   "Saúde continua fora do backup ({templates, sessions, cfg} não muda)"]},
  {v:"1.22.0",d:"2026-10-07",c:[
    "Análise (desktop): painel do cut no topo, uma linha por regra do plano — média semanal de peso, pesagens nesta semana, força dos 🔑 e calorias ativas — com o estado de hoje e o que a regra manda fazer. Regra disparada vira chip âmbar; o app não muda meta nenhuma sozinho",
    "O painel só aparece quando o arquivo do ciclo traz as regras do cut (cfg.cut). Sem dado, diz que não tem: 'sem pesagem no cut', 'semana não lida', 'sem comparação ainda'. O limiar de 'média parada' fica <A DEFINIR> até o arquivo trazer o número",
