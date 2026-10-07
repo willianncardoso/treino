@@ -186,6 +186,16 @@ body.wide .histchart{position:sticky;top:18px}
 .hm-saude .bx .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
 .hm-saude .bx .v{font-size:21px;font-weight:750;margin:2px 0 1px}
 .hm-saude .bx .d{font-size:12px;color:var(--muted)}
+.cfg-grupo{margin:18px 0 6px;text-transform:uppercase;font-weight:650;font-size:11px}
+.cfg-card{padding:2px 16px}
+.cfg-linha{width:100%;background:none;border:0;border-bottom:1px solid var(--border);border-radius:0;color:var(--text);font-size:16px;text-align:left;padding:14px 0;min-height:50px;display:flex;align-items:center;gap:10px}
+.cfg-linha .rt{flex:0 0 auto}
+.cfg-linha .sub{margin-left:auto;color:var(--muted);font-size:14px;text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cfg-linha .chev{color:var(--muted);font-size:20px;flex:0 0 auto;transition:transform .15s}
+.cfg-linha[aria-expanded=true] .chev{transform:rotate(90deg)}
+.cfg-card>:last-child{border-bottom:0}
+.cfg-corpo{padding:4px 0 14px;border-bottom:1px solid var(--border)}
+.cfg-backup{padding:14px 0;border-bottom:1px solid var(--border)}
 .hm-semana{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;margin:12px 0 10px}
 .hm-semana .lb{font-size:11px;color:var(--muted);margin-bottom:5px}
 .hm-dia{width:36px;height:36px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;background:var(--surface2);font-weight:700;font-size:13px;color:var(--muted)}
@@ -811,7 +821,7 @@ function isDesktop(){return window.matchMedia("(min-width: 900px)").matches;}
 /* P5.12 — sair da tela de confirmação pela tabbar deixava `pendingSave` pendurado até o
    reload. Não corrompe nada (o treino já está gravado e conferido), mas é estado morto:
    quem não vai pra "save" não tem confirmação pendente. */
-function go(t){if(t!=="save")pendingSave=null;tab=t;bkState={phase:"idle"};addExOpen=false;trPainel=null;comentAberto=null;rascunhoOk=null;render();window.scrollTo(0,0);}  // relatório de export é do toque, não do dia
+function go(t){if(t!=="save")pendingSave=null;if(t!=="cfg")cfgAberta=null;tab=t;bkState={phase:"idle"};addExOpen=false;trPainel=null;comentAberto=null;rascunhoOk=null;render();window.scrollTo(0,0);}  // relatório de export é do toque, não do dia
 /* P4.7: ligado só na retomada de sessão (reload e "Continuar treino →"), consumido pela
    renderLog. Nunca a cada série — a lista não pode se mexer no meio do toque. */
 let wantScrollActive=false;
@@ -1243,7 +1253,7 @@ function saudeCard(){
   if(E.modo==="erro"){c.innerHTML="<h2 style='margin:0'>Saúde</h2><div style='font-weight:600;margin-top:8px;color:var(--danger-tx)'>dados de saúde não puderam ser lidos</div>"+
     "<div class='muted' style='margin-top:2px'>ver Ajustes → Diagnóstico de dados · "+esc(E.motivo)+"</div>";return c;}
   if(E.modo==="vazio"){c.innerHTML="<div class='row'><div style='flex:1'><b>Saúde</b> <span class='muted'>· Sem dados de saúde neste aparelho</span></div></div>";
-    const b=el("button","btn-ghost btn-sm","Carregar em Ajustes →");b.onclick=()=>go("cfg");c.firstChild.appendChild(b);return c;}
+    const b=el("button","btn-ghost btn-sm","Carregar em Ajustes →");b.onclick=()=>{cfgAberta="health";go("cfg");};c.firstChild.appendChild(b);return c;}
   const H=E.H,D=H.daily,ate=E.ate,velho=daysSince(ate)>7;
   const bloco=(k,v,d,data)=>"<div class='bx' data-bloco='"+esc(k)+"'><div class='k'>"+esc(k)+"</div>"+(v==null?"<div class='d' style='margin-top:6px'>"+d+"</div>":"<div class='v'>"+v+"</div><div class='d'>"+d+"</div>")+"</div>";
   const ult=(m,fmt,nome)=>{if(!D[m])return [null,"não veio no arquivo · "+nome];const l=latestVal(D[m]);return l?[fmt(l.v),esc(quandoTxt(l.d))]:[null,"sem leitura · "+nome];};
@@ -1270,9 +1280,8 @@ function saudeCard(){
 }
 /* Card 🩺 Apple Health de Ajustes: o estado RELIDO do armazenamento + o resultado da última
    tentativa. "carregado" só aparece se a releitura trouxe o dado. */
-function healthCfgCard(){
-  const c=el("div","card");c.dataset.health="1";
-  c.appendChild(el("h3",null,"🩺 Apple Health"));
+function healthCfgCard(c){            // v1.24.0: desenha dentro da linha "Apple Health" de Ajustes
+  c.dataset.health="1";
   const E=healthEstado();
   let st;
   if(E.modo==="erro")st="<b style='color:var(--danger-tx)'>leitura falhou</b> · "+esc(E.motivo)+" · ver Diagnóstico de dados abaixo";
@@ -1289,7 +1298,6 @@ function healthCfgCard(){
   fi.onchange=()=>lerArquivoHealth(fi.files[0]);
   const b=el("button","btn-ghost btn-sm","⬆ Carregar apple_health.json");b.style.marginTop="8px";b.onclick=()=>fi.click();
   c.appendChild(b);c.appendChild(fi);
-  return c;
 }
 function lerArquivoHealth(f){if(!f)return;const rd=new FileReader();
   rd.onload=()=>{let d;try{d=JSON.parse(rd.result);}catch(e){healthUltimo={ok:false,motivo:"o arquivo não é JSON",t:Date.now()};render();return;}
@@ -3409,109 +3417,121 @@ function buildCharts(sess,H){
 }
 
 /* ---------- AJUSTES ---------- */
+/* v1.24.0 — P8.3 · Ajustes agrupados. Uma coluna de grupos (Treino · Durante o treino · Dados e
+   saúde · Sobre); cada linha diz o estado num subtítulo DERIVADO de um campo real e, ao tocar,
+   abre logo abaixo o conteúdo que já existia (uma aberta por vez). Nenhuma pilha de telas nova:
+   a única subtela continua sendo o editTemplate, cujo ✓ Concluir volta com "Editar treinos"
+   aberta. O backup fica sempre aberto, no topo do grupo de dados (visível sem rolar). */
+let cfgAberta=null;
 function renderCfg(a){
   a.appendChild(el("h1",null,"Ajustes"));
+  /* campo que não grava avisa (spec P8 (b) Ajustes): o silêncio dos oninput de antes saiu */
+  const salvaCfg=()=>{if(!save(K.cfg,cfg))toast("não foi gravado — ver Diagnóstico");};
+  const grupo=t=>{const h=el("div","sb-lbl cfg-grupo",esc(t));a.appendChild(h);const c=el("div","card cfg-card");a.appendChild(c);return c;};
+  /* linha: rótulo · subtítulo · ›. `acao` = o toque FAZ (importar, tema); `corpo` = o toque abre */
+  const linha=(card,id,rot,sub,opt)=>{
+    const b=el("button","cfg-linha");b.dataset.linha=id;
+    const aberta=cfgAberta===id&&!!opt.corpo;
+    b.innerHTML="<span class='rt'>"+esc(rot)+"</span><span class='sub'>"+(sub||"")+"</span><span class='chev' aria-hidden='true'>›</span>";
+    if(opt.corpo)b.setAttribute("aria-expanded",aberta?"true":"false");
+    b.onclick=opt.acao?opt.acao:()=>{cfgAberta=aberta?null:id;render();};
+    card.appendChild(b);
+    if(aberta){const c=el("div","cfg-corpo");c.dataset.corpo=id;opt.corpo(c);card.appendChild(c);}
+  };
 
-  const c1=el("div","card");
-  c1.appendChild(el("h3",null,"Ciclo atual"));
-  const g=el("div","grid2");
-  const ci=el("input");ci.type="text";ci.value=cfg.ciclo;ci.oninput=()=>{cfg.ciclo=ci.value;save(K.cfg,cfg);};
-  const pl=el("input");pl.type="text";pl.value=cfg.plano;pl.oninput=()=>{cfg.plano=pl.value;save(K.cfg,cfg);};
-  const b1=el("div");b1.appendChild(el("label","fld","Ciclo"));b1.appendChild(ci);
-  const b2=el("div");b2.appendChild(el("label","fld","Plano"));b2.appendChild(pl);
-  g.appendChild(b1);g.appendChild(b2);c1.appendChild(g);
+  /* ===== Treino ===== */
+  const gT=grupo("Treino");
+  linha(gT,"ciclo","Ciclo e plano",esc(cfg.ciclo||"—")+" · "+esc(cfg.plano||"—"),{corpo:c=>{
+    const g=el("div","grid2");
+    const ci=el("input");ci.type="text";ci.value=cfg.ciclo;ci.oninput=()=>{cfg.ciclo=ci.value;salvaCfg();};
+    const pl=el("input");pl.type="text";pl.value=cfg.plano;pl.oninput=()=>{cfg.plano=pl.value;salvaCfg();};
+    const b1=el("div");b1.appendChild(el("label","fld","Ciclo"));b1.appendChild(ci);
+    const b2=el("div");b2.appendChild(el("label","fld","Plano"));b2.appendChild(pl);
+    g.appendChild(b1);g.appendChild(b2);c.appendChild(g);}});
   /* P4.1 — a meta semanal alimenta o contador da Home. Mora aqui e não no código porque a
      R6 já baixou de 4 pra 3, e meta hardcoded sobrevive à decisão que a mudou. */
-  const g2=el("div","grid2");
-  const wg=el("input");wg.type="number";wg.min="1";wg.max="14";wg.inputMode="numeric";
-  wg.value=weekGoal();wg.oninput=()=>{cfg.weekGoal=parseInt(wg.value,10)||WEEK_GOAL_DEFAULT;save(K.cfg,cfg);};
-  const b3=el("div");b3.appendChild(el("label","fld","Meta de treinos por semana"));b3.appendChild(wg);
-  g2.appendChild(b3);c1.appendChild(g2);
-  c1.appendChild(el("div","muted","Aparece na Home como <b>N registrados · meta M</b>. Conta só o que foi registrado neste app."));
-  a.appendChild(c1);
+  linha(gT,"meta","Meta por semana",weekGoal()+(weekGoal()===1?" treino":" treinos"),{corpo:c=>{
+    const wg=el("input");wg.type="number";wg.min="1";wg.max="14";wg.inputMode="numeric";
+    wg.value=weekGoal();wg.oninput=()=>{cfg.weekGoal=parseInt(wg.value,10)||WEEK_GOAL_DEFAULT;salvaCfg();};
+    c.appendChild(el("label","fld","Meta de treinos por semana"));c.appendChild(wg);
+    c.appendChild(el("div","muted","Aparece na Home como <b>N de M</b>. Conta só o que foi registrado neste app."));}});
+  linha(gT,"treinos","Editar treinos",esc(Object.keys(templates).join(" · ")||"nenhum"),{corpo:c=>{
+    c.appendChild(el("div","muted","Toque para abrir e ajustar exercícios, alvos e descanso."));
+    Object.keys(templates).forEach(d=>{
+      const r=el("div","sess");
+      r.innerHTML="<div class='row'><span class='dot'>"+esc(d)+"</span><div style='font-weight:600'>"+esc(templates[d].name)+"</div>"+
+        (isAvulsoTpl(d)?"<span class='muted'>avulso</span>":"")+"</div>";
+      const b=el("button","btn-ghost btn-sm","Editar");b.onclick=()=>editTemplate(d);
+      r.appendChild(b);c.appendChild(r);
+    });}});
 
-  // music
-  const cm=el("div","card");
-  cm.appendChild(el("h3",null,"🎵 Playlist (Apple Music)"));
-  cm.appendChild(el("div","muted","Cole o link de compartilhamento da sua playlist Gym 2026. No iPhone, abrir o link chama o app Música."));
-  const mu=el("input");mu.type="url";mu.placeholder="https://music.apple.com/...";mu.style.textAlign="left";mu.style.marginTop="8px";
-  mu.value=cfg.musicUrl||"";mu.oninput=()=>{cfg.musicUrl=mu.value.trim();save(K.cfg,cfg);};
-  cm.appendChild(mu);
-  const tb=el("button","btn-ghost btn-sm","▶ Testar abrir");tb.style.marginTop="8px";tb.onclick=openMusic;
-  cm.appendChild(tb);
-  a.appendChild(cm);
-
+  /* ===== Durante o treino ===== */
+  const gD=grupo("Durante o treino");
+  linha(gD,"playlist","Playlist",cfg.musicUrl?"configurada":"não configurada",{corpo:c=>{
+    c.appendChild(el("div","muted","Cole o link de compartilhamento da sua playlist (Apple Music). No iPhone, abrir o link chama o app Música."));
+    const mu=el("input");mu.type="url";mu.placeholder="https://music.apple.com/...";mu.style.textAlign="left";mu.style.marginTop="8px";
+    mu.value=cfg.musicUrl||"";mu.oninput=()=>{cfg.musicUrl=mu.value.trim();salvaCfg();};
+    c.appendChild(mu);
+    const tb=el("button","btn-ghost btn-sm","▶ Testar abrir");tb.style.marginTop="8px";tb.onclick=openMusic;
+    c.appendChild(tb);}});
   /* P5.1 — o alarme nunca tocou no iPhone e nada na tela dizia isso. Testar aqui é o
      mesmo precedente do "▶ Testar abrir" da playlist: um toque, e a tela conta o que
      aconteceu de fato — não um toast que afirma sucesso sem saber. */
-  const ca=el("div","card");
-  ca.appendChild(el("h3",null,"🔔 Alarme do fim do descanso"));
-  ca.appendChild(el("div","muted","O iPhone só libera som depois de um toque, então o app libera no <b>▶ Descanso</b>. "+
-    "Se o alarme não soar durante o treino, teste aqui. <b>O botão de silencioso na lateral do iPhone cala o som</b> — isso o app não tem como contornar."));
-  const est=el("div","muted");est.style.marginTop="8px";est.textContent="estado: "+audioEstado();
-  const ba=el("button","btn-ghost btn-sm","🔔 Testar alarme");ba.style.marginTop="8px";
-  ba.onclick=()=>{ba.disabled=true;armAudio(ok=>{if(ok)beep();est.textContent="estado: "+audioEstado();ba.disabled=false;});};
-  ca.appendChild(ba);ca.appendChild(est);
-  a.appendChild(ca);
+  linha(gD,"alarme","Alarme do descanso",esc(audioEstado()),{corpo:c=>{
+    c.appendChild(el("div","muted","O iPhone só libera som depois de um toque, então o app libera no <b>▶ Descanso</b>. "+
+      "Se o alarme não soar durante o treino, teste aqui. <b>O botão de silencioso na lateral do iPhone cala o som</b> — isso o app não tem como contornar."));
+    const est=el("div","muted");est.style.marginTop="8px";est.textContent="estado: "+audioEstado();
+    const ba=el("button","btn-ghost btn-sm","🔔 Testar alarme");ba.style.marginTop="8px";
+    ba.onclick=()=>{ba.disabled=true;armAudio(ok=>{if(ok)beep();est.textContent="estado: "+audioEstado();ba.disabled=false;});};
+    c.appendChild(ba);c.appendChild(est);}});
 
-  // edit templates
-  const c2=el("div","card");
-  c2.appendChild(el("h3",null,"Editar treinos"));
-  c2.appendChild(el("div","muted","Toque para abrir e ajustar exercícios, alvos e descanso."));
-  Object.keys(templates).forEach(d=>{
-    const r=el("div","sess");
-    r.innerHTML="<div class='row'><span class='dot'>"+esc(d)+"</span><div style='font-weight:600'>"+esc(templates[d].name)+"</div>"+
-      (isAvulsoTpl(d)?"<span class='muted'>avulso</span>":"")+"</div>";
-    const b=el("button","btn-ghost btn-sm","Editar");b.onclick=()=>editTemplate(d);
-    r.appendChild(b);c2.appendChild(r);
-  });
-  a.appendChild(c2);
+  /* ===== Dados e saúde ===== */
+  const gS=grupo("Dados e saúde");
+  /* Backup sempre aberto. v1.4.0: um botão só, o mesmo da tela de fim de treino. O aviso longo
+     ("os dados ficam só neste navegador…") virou uma linha. Idade com a régua da P8.1. */
+  const bk=el("div","cfg-backup");bk.dataset.backup="1";
+  const bkTopo=el("div");bk.appendChild(bkTopo);
+  const desenhaTopo=()=>{const I=backupIdade();gS.style.borderColor=I.alerta?"var(--warn-tx)":"";
+    const quando=I.n!=null&&I.n>=0;
+    bkTopo.innerHTML="<div class='row' style='align-items:center'><h3 style='margin:0;flex:1"+(I.alerta?";color:var(--warn-tx)":"")+"'>Backup pro vault</h3>"+
+        "<span class='cchip"+(I.alerta?" w":"")+"'>"+esc(quando?I.txt:"sem registro")+"</span></div>"+
+      "<div class='muted' style='margin:4px 0 10px;font-size:13px'>"+(quando?"Último: <span id='cfgLastBk'>"+esc(ddmm(cfg.lastBackup))+"</span>. ":esc(I.txt)+". ")+
+        "Os dados ficam só neste navegador; salve o .json no iCloud Drive.</div>";};
+  desenhaTopo();
+  const bkh=el("div");bkh.onBk=desenhaTopo;renderBackupBlock(bkh);bk.appendChild(bkh);
+  gS.appendChild(bk);
+  linha(gS,"importar","Importar backup","⬆",{acao:doImport});
+  const E=healthEstado();
+  const hSub=E.modo==="erro"?"<span class='cchip' style='color:var(--danger-tx)'>leitura falhou</span>"
+    :E.modo==="vazio"?"não carregado"
+    :"<span class='cchip"+(daysSince(E.ate)>7?" w":" a")+"'>até "+esc(ddmm(E.ate))+"</span>";
+  linha(gS,"health","Apple Health",hSub,{corpo:c=>healthCfgCard(c)});
+  const si=storageInfo(),falhas=ioLogRead().filter(ioFail),corrompidas=Object.keys(si.det).filter(k=>k.indexOf("__corrompido_")>-1);
+  const totSets=sessions.reduce((x,s)=>x+(s.exercises||[]).reduce((b,e)=>b+(e.sets||[]).length,0),0);
+  const dRuim=falhas.length||corrompidas.length;
+  linha(gS,"diag","Diagnóstico de dados","<span"+(dRuim?" style='color:var(--danger-tx);font-weight:650'":"")+">"+
+    (readFailed(K.sess)?"histórico não lido":sessions.length+(sessions.length===1?" treino":" treinos")+" · "+totSets.toLocaleString("pt-BR")+" séries")+
+    (dRuim?" · "+(falhas.length?falhas.length+" falha(s)":"")+(falhas.length&&corrompidas.length?" · ":"")+(corrompidas.length?corrompidas.length+" cópia(s) corrompida(s)":""):"")+"</span>",
+    {corpo:c=>cfgDiagnostico(c,si,falhas,corrompidas,totSets)});
 
-  // backup
-  const c3=el("div","card");
-  c3.appendChild(el("h3",null,"Backup"));
-  /* v1.4.0: "⬇ Exportar dados" e "⬇ Todos os .md" viraram um botão só, com o mesmo
-     rótulo da tela de fim de treino — é a mesma coisa, não duas. O .md nunca teve
-     consumidor: o recolher_treino.py não lê .md vindo do celular. */
-  const bkh=el("div");renderBackupBlock(bkh);c3.appendChild(bkh);
-  const bar=el("div","row wrap");bar.style.marginTop="10px";
-  const imp=el("button","btn-ghost btn-sm","⬆ Importar");imp.onclick=doImport;
-  bar.appendChild(imp);
-  c3.appendChild(bar);
-  /* Aqui havia um toggle "Backup automático ao finalizar". A v1.2.0 tirou o backup
-     automático e o botão ficou: ligado, ele exibia "✓ Backup automático ao finalizar"
-     num app que não fazia backup nenhum. Confirmação tem que ser verdadeira — removido
-     na v1.3.1 em vez de religado. O backup é o "⬇ Exportar dados" acima, na sua mão. */
-  c3.appendChild(el("div","muted","<hr><b>⚠️ Importante:</b> os dados ficam só neste navegador. O iOS pode apagar o armazenamento do Safari após dias sem uso ou ao limpar histórico. Para não perder nada: toque em <b>⬇ Backup pro vault</b> depois de treinar e salve o <code>.json</code> no <b>iCloud Drive</b> (a raiz serve).<br>"+sessions.length+" treinos salvos · último backup: <b id='cfgLastBk'>"+(cfg.lastBackup||"nunca")+"</b>"));
-  const rst=el("button","btn-danger btn-sm","Resetar treinos p/ padrão");rst.style.marginTop="8px";
+  /* ===== Sobre ===== */
+  const gA=grupo("Sobre");
+  /* O alternador de tema morava só na Análise, que no celular não existe: no iPhone o tema não mudava. */
+  linha(gA,"tema","Tema",cfg.theme==="light"?"Claro":"Escuro",{acao:()=>{cfg.theme=(cfg.theme==="light")?"dark":"light";salvaCfg();applyTheme();render();}});
+  const rel=APP_RELEASED.split("-").reverse().join("/");
+  linha(gA,"versao","Versão","v"+esc(APP_VERSION)+" · "+esc(rel.slice(0,5)),{corpo:c=>{
+    c.innerHTML="<div class='muted' style='margin-bottom:8px'>Treino · v"+esc(APP_VERSION)+" · release "+esc(rel)+"</div>"+
+      APP_CHANGELOG.map(r=>"<div style='margin-bottom:10px;font-size:13px'><b>v"+esc(r.v)+"</b>"+
+        (r.d?" <span class='muted'>· "+r.d.split("-").reverse().join("/")+"</span>":"")+
+        "<ul style='margin:4px 0 0 18px;padding:0'>"+r.c.map(x=>"<li>"+esc(x)+"</li>").join("")+"</ul></div>").join("");}});
+
+  const rst=el("button","btn-danger btn-sm","Resetar treinos p/ padrão");rst.style.margin="4px 0 24px";
   rst.onclick=()=>{if(confirm("Restaurar os treinos padrão do código (Ciclo 3: A, B, C, D) e o E avulso? Os treinos do ciclo atual se perdem. (histórico é preservado)")){templates=JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));save(K.tpl,templates);toast("Restaurado");render();}};
-  c3.appendChild(rst);
-  a.appendChild(c3);
-
-  a.appendChild(healthCfgCard());                   // v1.23.0 — P7.2
-
-  // análise / Apple Health
-  const c4=el("div","card");
-  c4.appendChild(el("h3",null,"📊 Análise (desktop / Apple Health)"));
-  /* v1.4.0: o "⬇ treinos.json (análise)" saiu. Ele abria um segundo share sheet pra
-     produzir um arquivo que ninguém consome: o recolher_treino.py classifica o schema
-     `gymlog/*` vindo do celular como "ignorar" e regenera o treinos.json do zero a
-     partir do backup. Um arquivo a menos no share, zero informação perdida.
-     O import do Apple Health não fica neste card — fica na aba 📊 Análise, no desktop —
-     e continua onde estava. */
-  c4.appendChild(el("div","muted","O <b>treinos.json</b> (schema canônico, horário de cada série em ISO) "+
-    "não sai mais do celular: ele é regenerado no Mac pelo <code>recolher_treino.py</code> a partir do "+
-    "<b>⬇ Backup pro vault</b> acima. Um arquivo pra exportar, um lugar pra salvar.<br>"+
-    "A aba <b>📊 Análise</b> aparece no desktop (tela ≥900px)."));
-  a.appendChild(c4);
-
-  // ---- diagnóstico de dados ----
-  const cd=el("div","card");
-  cd.appendChild(el("h3",null,"Diagnóstico de dados"));
-  const si=storageInfo();
-  const totSets=sessions.reduce((a,x)=>a+(x.exercises||[]).reduce((b,e)=>b+(e.sets||[]).length,0),0);
+  a.appendChild(rst);
+}
+/* Conteúdo do Diagnóstico de dados — o mesmo de antes da v1.24.0, agora dentro da linha. */
+function cfgDiagnostico(cd,si,falhas,corrompidas,totSets){
   const last=sessions[sessions.length-1];
-  const corrompidas=Object.keys(si.det).filter(k=>k.indexOf("__corrompido_")>-1);
   cd.appendChild(el("div","muted",
     "Histórico: <b>"+sessions.length+"</b> treinos · <b>"+totSets+"</b> séries<br>"+
     "Ocupação: <b>"+Math.round(si.total/1024)+" KB</b> (treinos: "+Math.round((si.det[K.sess]||0)/1024)+" KB)<br>"+
@@ -3531,7 +3551,6 @@ function renderCfg(a){
       ".<br>O arquivo gravado só muda no próximo salvamento normal — nada foi reescrito agora.</span>";
     cd.appendChild(ap);
   }
-
   // últimos salvamentos, com conteúdo real
   const lw=el("div");lw.style.cssText="display:none;margin-top:10px";
   sessions.slice(-8).reverse().forEach(x=>{
@@ -3546,9 +3565,8 @@ function renderCfg(a){
   lb.onclick=()=>{const o=lw.style.display!=="none";lw.style.display=o?"none":"block";
     lb.textContent=o?"Ver últimos salvamentos":"Ocultar";};
   cd.appendChild(lb);cd.appendChild(lw);
-
   // log de gravações — falhas primeiro
-  const logs=ioLogRead(), falhas=logs.filter(ioFail);
+  const logs=ioLogRead();
   const gw=el("div");gw.style.cssText="display:none;margin-top:10px;font-size:12px";
   if(!logs.length)gw.appendChild(el("div","muted","Nenhum registro ainda."));
   logs.slice().reverse().forEach(r=>{
@@ -3565,28 +3583,6 @@ function renderCfg(a){
   gb.onclick=()=>{const o=gw.style.display!=="none";gw.style.display=o?"none":"block";
     gb.textContent=o?("Log de gravações"+(falhas.length?" ("+falhas.length+" falha(s))":"")):"Ocultar log";};
   cd.appendChild(gb);cd.appendChild(gw);
-  a.appendChild(cd);
-
-  // ---- rodapé de versão ----
-  const vf=el("div","card");
-  vf.style.cssText="text-align:center;opacity:.75";
-  const rel=APP_RELEASED.split("-").reverse().join("/");
-  vf.innerHTML="<div style='font-weight:600'>Treino · v"+APP_VERSION+"</div>"+
-               "<div class='muted' style='font-size:13px'>Release "+rel+"</div>";
-  const vlog=el("div");
-  vlog.style.cssText="display:none;text-align:left;margin-top:10px;font-size:13px";
-  vlog.innerHTML=APP_CHANGELOG.map(r=>
-      "<div style='margin-bottom:10px'><b>v"+esc(r.v)+"</b>"+
-      (r.d?" <span class='muted'>· "+r.d.split("-").reverse().join("/")+"</span>":"")+
-      "<ul style='margin:4px 0 0 18px;padding:0'>"+
-      r.c.map(x=>"<li>"+esc(x)+"</li>").join("")+"</ul></div>").join("");
-  const vb=el("button","btn-ghost btn-sm","Histórico de versões");
-  vb.style.marginTop="8px";
-  vb.onclick=()=>{const open=vlog.style.display!=="none";
-    vlog.style.display=open?"none":"block";
-    vb.textContent=open?"Histórico de versões":"Ocultar histórico";};
-  vf.appendChild(vb);vf.appendChild(vlog);
-  a.appendChild(vf);
 }
 
 /* ---------- EXPORT CANÔNICO (schema gymlog/v1) ---------- */
@@ -3682,7 +3678,7 @@ function editTemplate(d){
   const add=el("button","btn-ghost","+ Exercício");add.style.width="100%";
   add.onclick=()=>{t.ex.push({n:"Novo exercício",sr:"3×10",rest:60,mvw:false,notes:""});save(K.tpl,templates);editTemplate(d);};
   a.appendChild(add);
-  const bk=el("button","btn-primary","✓ Concluir");bk.style.width="100%";bk.style.marginTop="8px";bk.onclick=()=>go("cfg");
+  const bk=el("button","btn-primary","✓ Concluir");bk.style.width="100%";bk.style.marginTop="8px";bk.onclick=()=>{cfgAberta="treinos";go("cfg");};   // v1.24.0: volta com a linha aberta
   a.appendChild(bk);
 }
 function fldInput(lb,val,type,on){const w=el("div");w.appendChild(el("label","fld",lb));
@@ -3789,13 +3785,19 @@ function doImport(){
    continua em showMarkdown(), como cópia pra área de transferência. */
 
 /* ============ VERSÃO ============ */
-const APP_VERSION="1.23.0";
+const APP_VERSION="1.24.0";
 const APP_RELEASED="2026-10-07";
 /* Versionamento semântico MAJOR.MINOR.PATCH
    MAJOR = muda o formato dos dados (backup/restore incompatível)
    MINOR = funcionalidade nova, dados compatíveis
    PATCH = correção sem mudar comportamento                        */
 const APP_CHANGELOG=[
+ {v:"1.24.0",d:"2026-10-07",c:[
+   "Ajustes em quatro grupos — Treino, Durante o treino, Dados e saúde, Sobre. Cada linha diz o estado à direita (ciclo e plano, meta, letras, playlist configurada ou não, alarme, Apple Health até DD/MM, treinos e séries) e abre o que já existia logo abaixo, uma por vez",
+   "Backup pro vault fica sempre aberto no topo de Dados e saúde, com a idade do último backup (laranja a partir de 10 dias) e o aviso numa linha só",
+   "Tema claro/escuro agora muda também no iPhone: linha Tema em Sobre",
+   "Diagnóstico de dados fica vermelho quando há falha no log ou cópia corrompida. Campo que não consegue gravar avisa 'não foi gravado — ver Diagnóstico'",
+   "✓ Concluir na edição de um treino volta para Ajustes com Editar treinos aberto. O card 'Análise (desktop / Apple Health)' saiu: o que ele explicava está na linha Apple Health"]},
  {v:"1.23.0",d:"2026-10-07",c:[
    "Home: card Saúde abaixo de Esta semana, com Peso, Gordura, Exercício da semana e FC de repouso, cada um com a própria data. Cabeçalho 'Apple Health · até DD/MM', em laranja com 'há N dias' quando o arquivo tem mais de 7 dias",
    "Sem dado: 'Sem dados de saúde neste aparelho · Carregar em Ajustes →'. Métrica que não veio no arquivo diz que não veio; nada vira zero ou traço",
